@@ -1,0 +1,39 @@
+﻿@{
+    ViewData["Title"] = "Student Home Page";
+}
+
+@section Breadcrumb
+{
+    <li class="breadcrumb-item"><a href="@Url.Action("Index", "Home")">Home</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Students</li>
+}
+
+
+<div class="m-3">
+    <h3><b>Students</b></h3>
+</div>
+
+<div class="container border-2 p-4" style="max-width:3000px;">
+    <table id="student-grid" class="table table-striped" style="width:100%">
+        <thead>
+            <tr class="text-center">
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Address</th>
+                <th>Date of Enroll</th>
+            </tr>
+        </thead>
+    </table>
+</div>
+<div class="d-flex gap-3 mt-3 justify-content-end">
+    <button class="btn btn-default text-center btn-outline-success" id="create-button" onclick="addStudent()">Create</button>
+    <button class="btn btn-default text-center btn-outline-primary" onclick="editStudent()">Edit</button>
+    <button class="btn btn-default text-center btn-outline-danger" onclick="deleteStudent()">Delete</button>
+</div>
+
+@section Scripts
+{
+    <script src="~/js/student.js" asp-append-version="true"></script>
+}

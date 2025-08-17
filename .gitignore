@@ -1,0 +1,45 @@
+# Visual Studio / IDE
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vscode/
+
+# Build output
+bin/
+obj/
+out/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+
+# Logs
+*.log
+
+# Database
+*.mdf
+*.ldf
+*.db
+
+# Publish output
+*.Publish.xml
+
+# ASP.NET temporary files
+wwwroot/lib/
+*.pdb
+*.exe
+*.dll
+
+# Rider IDE
+.idea/
+
+# Resharper
+_ReSharper*/
+*.DotSettings.user
+
+# OS files
+Thumbs.db
+Desktop.ini

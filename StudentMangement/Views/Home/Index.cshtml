@@ -1,0 +1,13 @@
+﻿@{
+    ViewData["Title"] = "Student Management Landing Page";
+}
+
+<div class="container mt-5 text-center">
+    <h1>Welcome to Student Management</h1>
+    <p class="fs-5">Manage Students, Courses, and Enrollments easily.</p>
+    <div class="mt-4">
+        <a class="btn btn-outline-primary mx-2" href="@Url.Action("Index", "Student")">Students</a>
+        <a class="btn btn-outline-success mx-2" href="@Url.Action("Index", "Course")">Courses</a>
+        <a class="btn btn-outline-warning mx-2" href="@Url.Action("Index", "Enrollment")">Enrollments</a>
+    </div>
+</div>

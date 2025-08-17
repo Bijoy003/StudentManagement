@@ -1,0 +1,38 @@
+html {
+    font-size: 14px;
+}
+
+@media (min-width: 768px) {
+    html {
+        font-size: 16px;
+    }
+}
+
+html {
+    position: relative;
+    min-height: 100%;
+}
+
+body {
+    margin-bottom: 60px;
+}
+
+.selected-grid-row {
+    background-color: aqua !important;
+}
+
+.student-input, .student-input:read-only {
+    background-color: #F5F7FF;
+    border: 1px solid rgba(38, 83, 188, 0.2);
+    padding: 10px;
+    border-radius: 6px;
+    outline: none;
+}
+
+label {
+    min-width: 100px;
+}
+
+input {
+    min-width: 400px;
+}

@@ -1,0 +1,30 @@
+﻿@model StudentMangement.Models.Course
+
+@{
+    ViewData["Title"] = "Create Course";
+}
+
+@section Breadcrumb
+{
+    <li class="breadcrumb-item"><a href="@Url.Action("Index", "Home")">Home</a></li>
+    <li class="breadcrumb-item"><a href="@Url.Action("Index", "Course")">Courses</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Create</li>
+}
+
+<form class="p-3 mt-2" id="course-form" onsubmit="saveCourse(event)">
+    <div class="mb-3">
+        <label asp-for="Name" class="form-label">Course Name</label>
+        <input class="form-control" asp-for="Name" id="name" />
+    </div>
+    <div class="mb-3">
+        <label asp-for="Credits" class="form-label">Credits</label>
+        <input type="number" class="form-control" asp-for="Credits" id="credits" />
+    </div>
+    <button type="submit" class="btn btn-outline-success">Save</button>
+    <a class="btn btn-outline-danger" href="@Url.Action("Index", "Course")">Cancel</a>
+</form>
+
+@section Scripts
+{
+    <script src="~/js/course.js" asp-append-version="true"></script>
+}

@@ -1,0 +1,23 @@
+﻿@model IEnumerable<Course>
+@section Breadcrumb
+{
+    <li class="breadcrumb-item"><a href="@Url.Action("Index", "Home")">Home</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Courses</li>
+}
+
+<h3>Courses</h3>
+<table class="table table-striped">
+    <tr><th>ID</th><th>Name</th><th>Credits</th></tr>
+    @foreach (var c in Model)
+    {
+        <tr>
+            <td>@c.Id</td>
+            <td>@c.Name</td>
+            <td>@c.Credits</td>
+        </tr>
+    }
+</table>
+
+<a class="btn btn-outline-success mb-3" href="@Url.Action("Create", "Course")">Create New Course</a>
+<a class="btn btn-outline-success mb-3" href="@Url.Action("Create", "Enrollment")">Create New Enrollment</a>
+
