@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using StudentMangement.Abstraction.Services;
 using StudentMangement.Models;
+using StudentMangement.Services;
 
 namespace StudentMangement.Controllers
 {
@@ -59,6 +60,13 @@ namespace StudentMangement.Controllers
             {
                 return false;
             }
+        }
+
+        public IActionResult EnrolledInMoreThan(int courseCount = 2)
+        {
+            var students = _studentService.GetStudentsEnrolledInMoreThan(courseCount);
+            ViewBag.CourseCount = courseCount;
+            return View(students);
         }
     }
 }

@@ -7,40 +7,45 @@ namespace StudentMangement.Services
 {
     public class CourseService : ICourseService
     {
-        private readonly ICourseRepository _repo;
+        private readonly ICourseRepository _courseRepository;
 
         public CourseService(ICourseRepository repo)
         {
-            _repo = repo;
+            _courseRepository = repo;
         }
 
         public IEnumerable<Course> GetCourses()
         {
-            return _repo.GetAll();
+            return _courseRepository.GetAll();
         }
 
         public Course GetCourseById(int id)
         {
-            return _repo.GetById(id);
+            return _courseRepository.GetById(id);
         }
 
         public void SaveCourse(Course course)
         {
             if (course.Id == 0)
             {
-                _repo.Add(course);
+                _courseRepository.Add(course);
             }
             else
             {
-                _repo.Update(course);
+                _courseRepository.Update(course);
             }
-            _repo.Save();
+            _courseRepository.Save();
         }
 
         public void DeleteCourse(int id)
         {
-            _repo.Delete(id);
-            _repo.Save();
+            _courseRepository.Delete(id);
+            _courseRepository.Save();
+        }
+
+        public List<CourseStudentCount> GetStudentCountPerCourse()
+        {
+            return _courseRepository.GetStudentCountPerCourse();
         }
     }
 }

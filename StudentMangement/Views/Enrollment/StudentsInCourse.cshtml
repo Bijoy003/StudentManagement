@@ -1,0 +1,42 @@
+﻿@model List<StudentMangement.Models.Student>
+
+@{
+    ViewData["Title"] = "Students in Course";
+}
+
+<h3>@ViewData["Title"]</h3>
+
+<form method="get" class="mb-3">
+    <label>Select Course:</label>
+    <select name="courseId" class="form-select" asp-items="ViewBag.Courses" onchange="this.form.submit()">
+        <option value="">-- Select Course --</option>
+    </select>
+</form>
+
+<div class="container border-2 p-4 mt-3">
+    <table class="table table-striped">
+        <thead>
+            <tr class="text-center">
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Address</th>
+                <th>Date of Enroll</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var student in Model)
+            {
+                <tr class="text-center">
+                    <td>@student.Id</td>
+                    <td>@student.Name</td>
+                    <td>@student.Email</td>
+                    <td>@student.Phone</td>
+                    <td>@student.Address</td>
+                    <td>@student.DateOfEnroll?.ToString("yyyy-MM-dd")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

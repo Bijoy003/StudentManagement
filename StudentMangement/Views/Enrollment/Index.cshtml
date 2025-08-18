@@ -6,18 +6,30 @@
 }
 
 <h3>Enrollments</h3>
-<table class="table table-striped">
-    <tr><th>ID</th><th>Student</th><th>Course</th><th>Grade</th></tr>
-    @foreach (var e in Model)
-    {
-        <tr>
-            <td>@e.Id</td>
-            <td>@e.Student?.Name</td>
-            <td>@e.Course?.Name</td>
-            <td>@e.Grade</td>
-        </tr>
-    }
-</table>
 
-<a class="btn btn-outline-success mb-3" href="@Url.Action("Create", "Course")">Create New Course</a>
-<a class="btn btn-outline-success mb-3" href="@Url.Action("Create", "Enrollment")">Create New Enrollment</a>
+<div class="mb-3 d-flex gap-2">
+    <a class="btn btn-outline-primary" href="/Enrollment/StudentsInCourse">
+        Students in Course
+    </a>
+    <a class="btn btn-outline-success" href="/Enrollment/CoursesForStudent">
+        Top Courses per Student
+    </a>
+    <a class="btn btn-outline-secondary" href="/Enrollment/Create">
+        Add Enrollment
+    </a>
+</div>
+
+<div class="container border-2 p-4 mt-3">
+    <table class="table table-striped">
+        <tr><th>ID</th><th>Student</th><th>Course</th><th>Grade</th></tr>
+        @foreach (var e in Model)
+        {
+            <tr>
+                <td>@e.Id</td>
+                <td>@e.Student?.Name</td>
+                <td>@e.Course?.Name</td>
+                <td>@e.Grade</td>
+            </tr>
+        }
+    </table>
+</div>

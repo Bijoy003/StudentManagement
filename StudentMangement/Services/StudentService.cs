@@ -7,10 +7,12 @@ namespace StudentMangement.Services
     public class StudentService : IStudentService
     {
         private readonly IStudentRepository _studentRepository;
+        private readonly IEnrollmentRepository _enrollmentRepository;
 
-        public StudentService(IStudentRepository studentRepository)
+        public StudentService(IStudentRepository studentRepository, IEnrollmentRepository enrollmentRepository)
         {
             _studentRepository = studentRepository;
+            _enrollmentRepository = enrollmentRepository;
         }
 
         public IEnumerable<Student> GetStudents()
@@ -40,6 +42,11 @@ namespace StudentMangement.Services
         {
             _studentRepository.Delete(id);
             _studentRepository.Save();
+        }
+
+        public List<Student> GetStudentsEnrolledInMoreThan(int courseCount)
+        {
+            return _enrollmentRepository.GetStudentsEnrolledInMoreThan(courseCount);
         }
     }
 }

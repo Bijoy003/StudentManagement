@@ -1,0 +1,41 @@
+﻿@model List<Student>
+
+<h2>Students Enrolled in More than @ViewBag.CourseCount Courses</h2>
+
+<form asp-controller="Student" asp-action="EnrolledInMoreThan" method="get" class="mb-3">
+    <div class="form-group">
+        <label for="courseCount">Enter Number of Courses:</label>
+        <input type="number" class="form-control" id="courseCount" name="courseCount"
+               value="@ViewBag.CourseCount" min="1" />
+    </div>
+    <button type="submit" class="btn btn-primary">Filter</button>
+</form>
+
+@if (Model != null && Model.Any())
+{
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Student Id</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Total Enrollments</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var student in Model)
+            {
+                <tr>
+                    <td>@student.Id</td>
+                    <td>@student.Name</td>
+                    <td>@student.Email</td>
+                    <td>@student.Enrollments?.Count</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else if (ViewBag.CourseCount != null)
+{
+    <p>No students found for this filter.</p>
+}

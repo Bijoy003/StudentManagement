@@ -6,6 +6,16 @@
 }
 
 <h3>Courses</h3>
+
+<div class="mb-3 d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="/Course/Create">
+        Add Course
+    </a>
+    <a class="btn btn-outline-success" href="/Course/StudentCountPerCourse">
+        Students per Course
+    </a>
+</div>
+
 <table class="table table-striped">
     <tr><th>ID</th><th>Name</th><th>Credits</th></tr>
     @foreach (var c in Model)
@@ -17,7 +27,3 @@
         </tr>
     }
 </table>
-
-<a class="btn btn-outline-success mb-3" href="@Url.Action("Create", "Course")">Create New Course</a>
-<a class="btn btn-outline-success mb-3" href="@Url.Action("Create", "Enrollment")">Create New Enrollment</a>
-

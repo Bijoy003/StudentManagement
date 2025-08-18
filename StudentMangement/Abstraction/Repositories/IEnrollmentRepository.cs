@@ -1,4 +1,5 @@
-﻿using StudentMangement.Models;
+﻿using Microsoft.EntityFrameworkCore;
+using StudentMangement.Models;
 
 namespace StudentMangement.Abstraction.Repositories
 {
@@ -12,5 +13,13 @@ namespace StudentMangement.Abstraction.Repositories
         void Save();
 
         IEnumerable<Enrollment> GetByCourseId(int courseId);
+
+        // Students enrolled in a specific course
+        List<Student> GetStudentsByCourse(int courseId);
+
+        List<Course> GetCoursesByStudent(int studentId);
+
+        // Students enrolled in more than N courses
+        List<Student> GetStudentsEnrolledInMoreThan(int courseCount);
     }
 }

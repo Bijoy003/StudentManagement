@@ -1,0 +1,21 @@
+﻿@model List<StudentMangement.Models.CourseStudentCount>
+
+<h2>Student Count per Course</h2>
+
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Course Name</th>
+            <th>Number of Students</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>@item.CourseName</td>
+                <td>@item.StudentCount</td>
+            </tr>
+        }
+    </tbody>
+</table>

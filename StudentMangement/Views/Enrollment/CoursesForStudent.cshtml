@@ -1,0 +1,30 @@
+﻿@model List<StudentMangement.Models.Course>
+
+<form method="get" class="mb-3">
+    <label>Select Student:</label>
+    <select name="studentId" class="form-select" asp-items="ViewBag.Students" onchange="this.form.submit()">
+        <option value="">-- Select Student --</option>
+    </select>
+</form>
+
+<div class="container border-2 p-4 mt-3" style="max-width:1000px;">
+    <table class="table table-striped">
+        <thead>
+            <tr class="text-center">
+                <th>ID</th>
+                <th>Course Name</th>
+                <th>Credits</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var course in Model)
+            {
+                <tr class="text-center">
+                    <td>@course.Id</td>
+                    <td>@course.Name</td>
+                    <td>@course.Credits</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

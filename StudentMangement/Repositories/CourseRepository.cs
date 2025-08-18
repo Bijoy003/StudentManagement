@@ -48,6 +48,19 @@ namespace StudentMangement.Repositories
         {
             _dbContext.SaveChanges();
         }
+
+        public List<CourseStudentCount> GetStudentCountPerCourse()
+        {
+            return _dbContext.Enrollments
+                .GroupBy(e => new { e.CourseId, e.Course.Name })
+                .Select(g => new CourseStudentCount
+                {
+                    CourseName = g.Key.Name,
+                    StudentCount = g.Count()
+                })
+                .ToList();
+        }
+
     }
 
 }

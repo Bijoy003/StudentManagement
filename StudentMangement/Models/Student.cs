@@ -11,5 +11,7 @@ namespace StudentMangement.Models
         public string? Phone { get; set; }
         public string? Address { get; set; }
         public DateTime? DateOfEnroll { get; set; }
+
+        public ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
     }
 }

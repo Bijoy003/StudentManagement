@@ -1,21 +1,22 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using StudentMangement.Abstraction.Services;
 using StudentMangement.Models;
+using StudentMangement.Services;
 
 namespace StudentMangement.Controllers
 {
     public class CourseController : Controller
     {
-        private readonly ICourseService _service;
+        private readonly ICourseService _courseService;
 
         public CourseController(ICourseService service)
         {
-            _service = service;
+            _courseService = service;
         }
 
         public IActionResult Index()
         {
-            var courses = _service.GetCourses();
+            var courses = _courseService.GetCourses();
             return View(courses);
         }
 
@@ -29,7 +30,7 @@ namespace StudentMangement.Controllers
             }
             else
             {
-                course = _service.GetCourseById(id.Value);
+                course = _courseService.GetCourseById(id.Value);
             }
 
             return View(course);
@@ -40,7 +41,7 @@ namespace StudentMangement.Controllers
         {
             try
             {
-                _service.SaveCourse(course);
+                _courseService.SaveCourse(course);
                 return Ok(true);
             }
             catch
@@ -53,7 +54,7 @@ namespace StudentMangement.Controllers
         {
             try
             {
-                _service.DeleteCourse(id);
+                _courseService.DeleteCourse(id);
                 return true;
             }
             catch
@@ -61,5 +62,12 @@ namespace StudentMangement.Controllers
                 return false;
             }
         }
+
+        public IActionResult StudentCountPerCourse()
+        {
+            var data = _courseService.GetStudentCountPerCourse();
+            return View(data);
+        }
+
     }
 }

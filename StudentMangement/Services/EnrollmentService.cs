@@ -6,45 +6,56 @@ namespace StudentMangement.Services
 {
     public class EnrollmentService : IEnrollmentService
     {
-        private readonly IEnrollmentRepository _repo;
+        private readonly IEnrollmentRepository _enrollmentRepository;
 
         public EnrollmentService(IEnrollmentRepository repo)
         {
-            _repo = repo;
+            _enrollmentRepository = repo;
         }
 
         public IEnumerable<Enrollment> GetEnrollments()
         {
-            return _repo.GetAll();
+            return _enrollmentRepository.GetAll();
         }
 
         public Enrollment GetEnrollmentById(int id)
         {
-            return _repo.GetById(id);
+            return _enrollmentRepository.GetById(id);
         }
 
         public void SaveEnrollment(Enrollment enrollment)
         {
             if (enrollment.Id == 0)
             {
-                _repo.Add(enrollment);
+                _enrollmentRepository.Add(enrollment);
             }
             else
             {
-                _repo.Update(enrollment);
+                _enrollmentRepository.Update(enrollment);
             }
-            _repo.Save();
+            _enrollmentRepository.Save();
         }
 
         public void DeleteEnrollment(int id)
         {
-            _repo.Delete(id);
-            _repo.Save();
+            _enrollmentRepository.Delete(id);
+            _enrollmentRepository.Save();
         }
 
         public IEnumerable<Enrollment> GetEnrollmentsByCourse(int courseId)
         {
-            return _repo.GetByCourseId(courseId);
+            return _enrollmentRepository.GetByCourseId(courseId);
         }
+
+        public List<Student> GetStudentsInCourse(int courseId)
+        {
+            return _enrollmentRepository.GetStudentsByCourse(courseId);
+        }
+
+        public List<Course> GetCoursesForStudent(int studentId)
+        {
+            return _enrollmentRepository.GetCoursesByStudent(studentId);
+        }
+
     }
 }

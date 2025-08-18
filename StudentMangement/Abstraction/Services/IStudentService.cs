@@ -8,5 +8,6 @@ namespace StudentMangement.Abstraction.Services
         Student GetStudentById(int id);
         void SaveStudent(Student student);
         void DeleteStudent(int id);
+        List<Student> GetStudentsEnrolledInMoreThan(int courseCount);
     }
 }
