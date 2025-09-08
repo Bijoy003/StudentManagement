@@ -43,7 +43,7 @@ namespace StudentMangement.Services
             _courseRepository.Save();
         }
 
-        public List<CourseStudentCount> GetStudentCountPerCourse()
+        public List<CourseStudentCountDto> GetStudentCountPerCourse()
         {
             return _courseRepository.GetStudentCountPerCourse();
         }

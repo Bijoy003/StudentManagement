@@ -99,6 +99,7 @@ function saveStudent(event) {
         })
         .catch((error) => {
             console.log(error);
+            showValidationErrors(error);
         });
 }
 
@@ -154,7 +155,7 @@ function verifyStudent(student) {
         return false;
     }
     else if (student.Phone === "null") {
-        toastr.warning("Name can't be empty.");
+        toastr.warning("Phone can't be empty.");
         return false;
     }
     return true;
@@ -190,4 +191,8 @@ let ajaxPostAsync = async (url, data) => {
             return error;
         }
     });
+}
+
+function showValidationErrors(error) {
+    toastr.warning(error.responseJSON.message);
 }

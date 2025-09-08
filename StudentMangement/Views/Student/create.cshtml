@@ -16,43 +16,60 @@
 
 <form class="p-3 mt-2" id="student-form" onsubmit="saveStudent(event)">
     <label class="fs-5 fw-bold">Student Form</label>
-    @* @if (ViewBag.Student != null)
-    {
 
-    } *@
     <div class="p-3">
         <div class="row gap-3 pt-3">
             <div class="col">
                 <label asp-for="Name" class="mb-2">Name</label>
-                <input class="student-input" asp-for="Name" id="name" value="@(ViewBag.Student?.Name ==null||ViewBag.Student?.Name =="null"? string.Empty:ViewBag.Student.Name)" />
+                <input class="student-input" asp-for="Name" id="name"
+                       value="@(ViewBag.Student?.Name == null || ViewBag.Student?.Name == "null" ? string.Empty : ViewBag.Student.Name)" />
+                <span asp-validation-for="Name" class="text-danger"></span>
             </div>
             <div class="col">
                 <label asp-for="Email" class="mb-2">Email</label>
-                <input class="student-input" asp-for="Email" id="email" value="@(ViewBag.Student?.Email ==null||ViewBag.Student?.Email =="null"? string.Empty:ViewBag.Student.Email)" />
+                <input class="student-input" asp-for="Email" id="email"
+                       value="@(ViewBag.Student?.Email == null || ViewBag.Student?.Email == "null" ? string.Empty : ViewBag.Student.Email)" />
+                <span asp-validation-for="Email" class="text-danger"></span>
             </div>
         </div>
+
         <div class="row gap-3 pt-3">
             <div class="col">
                 <label asp-for="Phone" class="mb-2">Phone</label>
-                <input class="student-input" asp-for="Phone" id="phone" value="@(ViewBag.Student?.Phone ==null||ViewBag.Student?.Phone =="null"? string.Empty:ViewBag.Student.Phone)" />
+                <input class="student-input" asp-for="Phone" id="phone"
+                       value="@(ViewBag.Student?.Phone == null || ViewBag.Student?.Phone == "null" ? string.Empty : ViewBag.Student.Phone)" />
+                <span asp-validation-for="Phone" class="text-danger"></span>
             </div>
             <div class="col">
                 <label asp-for="Address" class="mb-2">Address</label>
-                <input class="student-input" asp-for="Address" id="address" value="@(ViewBag.Student?.Address == null || ViewBag.Student?.Address == "null" ? string.Empty : ViewBag.Student.Address)" />
+                <input class="student-input" asp-for="Address" id="address"
+                       value="@(ViewBag.Student?.Address == null || ViewBag.Student?.Address == "null" ? string.Empty : ViewBag.Student.Address)" />
+                <span asp-validation-for="Address" class="text-danger"></span>
             </div>
         </div>
+
         <div class="row gap-3 pt-3">
             <div class="col">
                 <label asp-for="DateOfEnroll" class="mb-2">Date</label>
-                <input class="student-input" asp-for="DateOfEnroll" id="date-of-enroll" value="@((DateTime?)ViewBag.Student?.DateOfEnroll)?.ToString(" yyyy-MM-dd HH:mm:ss")" />
+                <input class="student-input" asp-for="DateOfEnroll" id="date-of-enroll"
+                       value="@((DateTime?)ViewBag.Student?.DateOfEnroll)?.ToString(" yyyy-MM-dd")" />
+                <span asp-validation-for="DateOfEnroll" class="text-danger"></span>
             </div>
         </div>
     </div>
+
     <div class="d-flex gap-3">
-        <button id="btn-cancel" onclick="cancelButtonClicked()" type="button" class="btn btn-outline-danger align-content-center">Cancel</button>
-        <button id="btn-save" type="submit" class="btn btn-outline-success text-center">Save</button>
+        <button id="btn-cancel" onclick="cancelButtonClicked()" type="button"
+                class="btn btn-outline-danger align-content-center">
+            Cancel
+        </button>
+        <button id="btn-save" type="submit"
+                class="btn btn-outline-success text-center">
+            Save
+        </button>
     </div>
 </form>
+
 
 @section Scripts
 {

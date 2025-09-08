@@ -10,6 +10,6 @@ namespace StudentMangement.Abstraction.Repositories
         void Update(Course course);
         void Delete(int id);
         void Save();
-        List<CourseStudentCount> GetStudentCountPerCourse();
+        List<CourseStudentCountDto> GetStudentCountPerCourse();
     }
 }

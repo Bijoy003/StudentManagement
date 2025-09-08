@@ -40,6 +40,15 @@ namespace StudentMangement.Controllers
         {
             try
             {
+                if (!ModelState.IsValid)
+                {
+                    var firstError = ModelState.Values
+                        .SelectMany(v => v.Errors)
+                        .Select(e => e.ErrorMessage)
+                        .FirstOrDefault();
+
+                    return BadRequest(new { Message = firstError });
+                }
                 _studentService.SaveStudent(student);
                 return Ok(true);
             }

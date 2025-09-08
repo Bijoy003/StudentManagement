@@ -8,6 +8,6 @@ namespace StudentMangement.Abstraction.Services
         Course GetCourseById(int id);
         void SaveCourse(Course course);
         void DeleteCourse(int id);
-        List<CourseStudentCount> GetStudentCountPerCourse();
+        List<CourseStudentCountDto> GetStudentCountPerCourse();
     }
 }
