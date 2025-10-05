@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using StudentMangement.Abstraction.Services;
 using StudentMangement.Models;
-using StudentMangement.Services;
 
 namespace StudentMangement.Controllers
 {
@@ -14,13 +13,13 @@ namespace StudentMangement.Controllers
             _courseService = service;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            var courses = _courseService.GetCourses();
+            var courses = await _courseService.GetAllCourses();
             return View(courses);
         }
 
-        public IActionResult Create(int? id)
+        public async Task<IActionResult> Create(int? id)
         {
             Course course;
 
@@ -30,18 +29,27 @@ namespace StudentMangement.Controllers
             }
             else
             {
-                course = _courseService.GetCourseById(id.Value);
+                course = await _courseService.GetCourseById(id.Value);
             }
 
             return View(course);
         }
 
         [HttpPost]
-        public IActionResult Save([FromBody] Course course)
+        public async Task<IActionResult> Save([FromBody] Course course)
         {
             try
             {
-                _courseService.SaveCourse(course);
+                if (!ModelState.IsValid)
+                {
+                    var firstError = ModelState.Values
+                        .SelectMany(v => v.Errors)
+                        .Select(e => e.ErrorMessage)
+                        .FirstOrDefault();
+
+                    return BadRequest(new { Message = firstError });
+                }
+                await _courseService.SaveCourse(course);
                 return Ok(true);
             }
             catch
@@ -50,11 +58,11 @@ namespace StudentMangement.Controllers
             }
         }
 
-        public bool Delete(int id)
+        public async Task<bool> Delete(int id)
         {
             try
             {
-                _courseService.DeleteCourse(id);
+                await _courseService.DeleteCourse(id);
                 return true;
             }
             catch
@@ -63,11 +71,10 @@ namespace StudentMangement.Controllers
             }
         }
 
-        public IActionResult StudentCountPerCourse()
+        public async Task<IActionResult> StudentCountPerCourse()
         {
-            var data = _courseService.GetStudentCountPerCourse();
+            var data = await _courseService.GetStudentCountPerCourse();
             return View(data);
         }
-
     }
 }

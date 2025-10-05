@@ -5,21 +5,21 @@ namespace StudentMangement.Abstraction.Repositories
 {
     public interface IEnrollmentRepository
     {
-        IEnumerable<Enrollment> GetAll();
-        Enrollment GetById(int id);
-        void Add(Enrollment enrollment);
+        Task<IEnumerable<Enrollment>> GetAllAsync();
+        Task<Enrollment> GetByIdAsync(int id);
+        Task AddAsync(Enrollment enrollment);
         void Update(Enrollment enrollment);
-        void Delete(int id);
-        void Save();
+        Task DeleteAsync(int id);
+        Task SaveChangesAsync();
 
-        IEnumerable<Enrollment> GetByCourseId(int courseId);
+        Task<IEnumerable<Enrollment>> GetByCourseIdAsync(int courseId);
 
         // Students enrolled in a specific course
-        List<Student> GetStudentsByCourse(int courseId);
+        Task<List<Student>> GetStudentsByCourseAsync(int courseId);
 
-        List<Course> GetCoursesByStudent(int studentId);
+        Task<List<Course>> GetCoursesByStudentAsync(int studentId);
 
         // Students enrolled in more than N courses
-        List<Student> GetStudentsEnrolledInMoreThan(int courseCount);
+        Task<List<Student>> GetStudentsEnrolledInMoreThanAsync(int courseCount);
     }
 }

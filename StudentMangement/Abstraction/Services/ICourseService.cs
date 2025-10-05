@@ -4,10 +4,10 @@ namespace StudentMangement.Abstraction.Services
 {
     public interface ICourseService
     {
-        IEnumerable<Course> GetCourses();
-        Course GetCourseById(int id);
-        void SaveCourse(Course course);
-        void DeleteCourse(int id);
-        List<CourseStudentCountDto> GetStudentCountPerCourse();
+        Task<IEnumerable<Course>> GetAllCourses();
+        Task<Course> GetCourseById(int id);
+        Task SaveCourse(Course course);
+        Task DeleteCourse(int id);
+        Task<List<CourseStudentCountDto>> GetStudentCountPerCourse();
     }
 }

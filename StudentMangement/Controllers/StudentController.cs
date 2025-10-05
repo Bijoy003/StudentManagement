@@ -1,17 +1,18 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using StudentMangement.Abstraction.Services;
 using StudentMangement.Models;
-using StudentMangement.Services;
 
 namespace StudentMangement.Controllers
 {
     public class StudentController : Controller
     {
         private readonly IStudentService _studentService;
+        private readonly ILogger<StudentController> _logger;
 
-        public StudentController(IStudentService studentService)
+        public StudentController(IStudentService studentService, ILogger<StudentController> logger)
         {
             _studentService = studentService;
+            _logger = logger;
         }
 
         public IActionResult Index()
@@ -19,24 +20,25 @@ namespace StudentMangement.Controllers
             return View();
         }
 
-        public JsonResult GetStudentList()
+        public async Task<JsonResult> GetStudentList()
         {
-            var students = _studentService.GetStudents();
+            var students = await _studentService.GetStudentsAsync();
             return new JsonResult(students);
         }
 
-        public IActionResult Create(int? id)
+        public async Task<IActionResult> Create(int? id)
         {
             ViewBag.Student = null;
             if (id != null)
             {
-                ViewBag.Student = _studentService.GetStudentById(id.Value);
+                ViewBag.Student = await _studentService.GetStudentByIdAsync(id.Value);
             }
             return View();
         }
 
         [HttpPost]
-        public IActionResult SaveStudent([FromBody] Student student)
+        //[ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveStudent([FromBody] Student student)
         {
             try
             {
@@ -49,31 +51,33 @@ namespace StudentMangement.Controllers
 
                     return BadRequest(new { Message = firstError });
                 }
-                _studentService.SaveStudent(student);
+                await _studentService.SaveStudentAsync(student);
                 return Ok(true);
             }
-            catch
+            catch (Exception ex)
             {
-                return Ok(false);
+                _logger.LogError(ex, "Error while saving student: {StudentName}", student?.Name);
+                return StatusCode(500, new { Message = "An unexpected error occurred." });
             }
         }
 
-        public bool DeleteStudent(int id)
+        public async Task<IActionResult> DeleteStudent(int id)
         {
             try
             {
-                _studentService.DeleteStudent(id);
-                return true;
+                await _studentService.DeleteStudentAsync(id);
+                return Ok(true);
             }
-            catch
+            catch (Exception ex)
             {
-                return false;
+                _logger.LogError(ex, "Error while deleting student: {Id}", id);
+                return StatusCode(500, new { Message = "An unexpected error occurred." });
             }
         }
 
-        public IActionResult EnrolledInMoreThan(int courseCount = 2)
+        public async Task<IActionResult> EnrolledInMoreThan(int courseCount = 2)
         {
-            var students = _studentService.GetStudentsEnrolledInMoreThan(courseCount);
+            var students = await _studentService.GetStudentsEnrolledInMoreThan(courseCount);
             ViewBag.CourseCount = courseCount;
             return View(students);
         }

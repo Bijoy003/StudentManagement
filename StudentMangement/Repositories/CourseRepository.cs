@@ -1,8 +1,7 @@
-﻿using StudentMangement.Abstraction.Repositories;
+﻿using Microsoft.EntityFrameworkCore;
+using StudentMangement.Abstraction.Repositories;
 using StudentMangement.Data;
 using StudentMangement.Models;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace StudentMangement.Repositories
 {
@@ -15,19 +14,19 @@ namespace StudentMangement.Repositories
             _dbContext = dbContext;
         }
 
-        public IEnumerable<Course> GetAll()
+        public async Task<IEnumerable<Course>> GetAllAsync()
         {
-            return _dbContext.Courses.ToList();
+            return await _dbContext.Courses.ToListAsync();
         }
 
-        public Course GetById(int id)
+        public async Task<Course> GetByIdAsync(int id)
         {
-            return _dbContext.Courses.FirstOrDefault(c => c.Id == id);
+            return await _dbContext.Courses.FirstOrDefaultAsync(c => c.Id == id);
         }
 
-        public void Add(Course course)
+        public async Task AddAsync(Course course)
         {
-            _dbContext.Courses.Add(course);
+            await _dbContext.Courses.AddAsync(course);
         }
 
         public void Update(Course course)
@@ -35,23 +34,23 @@ namespace StudentMangement.Repositories
             _dbContext.Courses.Update(course);
         }
 
-        public void Delete(int id)
+        public async Task DeleteAsync(int id)
         {
-            var course = GetById(id);
+            var course = await GetByIdAsync(id);
             if (course != null)
             {
                 _dbContext.Courses.Remove(course);
             }
         }
 
-        public void Save()
+        public async Task SaveChangesAsync()
         {
-            _dbContext.SaveChanges();
+            await _dbContext.SaveChangesAsync();
         }
 
-        public List<CourseStudentCountDto> GetStudentCountPerCourse()
+        public async Task<List<CourseStudentCountDto>> GetStudentCountPerCourseAsync()
         {
-            return _dbContext.Courses
+            return await _dbContext.Courses
                                 .Join(_dbContext.Enrollments,
                                       c => c.Id,
                                       e => e.CourseId,
@@ -63,7 +62,7 @@ namespace StudentMangement.Repositories
                                     StudentCount = g.Count(),
                                     course = g.FirstOrDefault(),
                                 })
-                                .ToList();
+                                .ToListAsync();
         }
 
 

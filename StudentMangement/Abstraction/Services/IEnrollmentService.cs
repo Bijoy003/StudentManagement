@@ -4,14 +4,12 @@ namespace StudentMangement.Abstraction.Services
 {
     public interface IEnrollmentService
     {
-        IEnumerable<Enrollment> GetEnrollments();
-        Enrollment GetEnrollmentById(int id);
-        void SaveEnrollment(Enrollment enrollment);
-        void DeleteEnrollment(int id);
-        IEnumerable<Enrollment> GetEnrollmentsByCourse(int courseId);
-
-        List<Student> GetStudentsInCourse(int courseId);
-
-        List<Course> GetCoursesForStudent(int studentId);
+        Task<IEnumerable<Enrollment>> GetEnrollments();
+        Task<Enrollment> GetEnrollmentById(int id);
+        Task SaveEnrollment(Enrollment enrollment);
+        Task DeleteEnrollment(int id);
+        Task<IEnumerable<Enrollment>> GetEnrollmentsByCourse(int courseId);
+        Task<List<Student>> GetStudentsInCourse(int courseId);
+        Task<List<Course>> GetCoursesForStudent(int studentId);
     }
 }

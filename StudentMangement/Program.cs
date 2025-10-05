@@ -1,3 +1,4 @@
+using AspNetCoreRateLimit;
 using Microsoft.EntityFrameworkCore;
 using StudentMangement.Abstraction.Repositories;
 using StudentMangement.Abstraction.Services;
@@ -6,6 +7,17 @@ using StudentMangement.Repositories;
 using StudentMangement.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Add in-memory caching
+builder.Services.AddMemoryCache();
+
+// Load configuration
+builder.Services.Configure<IpRateLimitOptions>(
+    builder.Configuration.GetSection("IpRateLimiting"));
+
+// Required services
+builder.Services.AddInMemoryRateLimiting();
+builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
@@ -31,6 +43,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+app.UseIpRateLimiting();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 

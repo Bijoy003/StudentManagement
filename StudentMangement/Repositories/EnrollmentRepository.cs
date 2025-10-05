@@ -14,19 +14,19 @@ namespace StudentMangement.Repositories
             _dbContext = dbContext;
         }
 
-        public IEnumerable<Enrollment> GetAll()
+        public async Task<IEnumerable<Enrollment>> GetAllAsync()
         {
-            return _dbContext.Enrollments.ToList();
+            return await _dbContext.Enrollments.ToListAsync();
         }
 
-        public Enrollment GetById(int id)
+        public async Task<Enrollment> GetByIdAsync(int id)
         {
-            return _dbContext.Enrollments.FirstOrDefault(e => e.Id == id);
+            return await _dbContext.Enrollments.FirstOrDefaultAsync(e => e.Id == id);
         }
 
-        public void Add(Enrollment enrollment)
+        public async Task AddAsync(Enrollment enrollment)
         {
-            _dbContext.Enrollments.Add(enrollment);
+            await _dbContext.Enrollments.AddAsync(enrollment);
         }
 
         public void Update(Enrollment enrollment)
@@ -34,42 +34,42 @@ namespace StudentMangement.Repositories
             _dbContext.Enrollments.Update(enrollment);
         }
 
-        public void Delete(int id)
+        public async Task DeleteAsync(int id)
         {
-            var enrollment = GetById(id);
+            var enrollment = await GetByIdAsync(id);
             if (enrollment != null)
             {
                 _dbContext.Enrollments.Remove(enrollment);
             }
         }
 
-        public void Save()
+        public async Task SaveChangesAsync()
         {
-            _dbContext.SaveChanges();
+            await _dbContext.SaveChangesAsync();
         }
 
-        public IEnumerable<Enrollment> GetByCourseId(int courseId)
+        public async Task<IEnumerable<Enrollment>> GetByCourseIdAsync(int courseId)
         {
-            return _dbContext.Enrollments
+            return await _dbContext.Enrollments
                              .Where(e => e.CourseId == courseId)
-                             .ToList();
+                             .ToListAsync();
         }
 
         // Students enrolled in a specific course
-        public List<Student> GetStudentsByCourse(int courseId)
+        public async Task<List<Student>> GetStudentsByCourseAsync(int courseId)
         {
-            return _dbContext.Enrollments
+            return await _dbContext.Enrollments
                 .Where(e => e.CourseId == courseId)
                 .Select(e => e.Student)
-                .ToList();
+                .ToListAsync();
         }
 
-        public List<Course> GetCoursesByStudent(int studentId)
+        public async Task<List<Course>> GetCoursesByStudentAsync(int studentId)
         {
-            return _dbContext.Enrollments
+            return await _dbContext.Enrollments
                 .Where(e => e.StudentId == studentId)
                 .Select(e => e.Course)
-                .ToList();
+                .ToListAsync();
         }
 
         // Students enrolled in more than N courses
@@ -89,13 +89,13 @@ namespace StudentMangement.Repositories
         //            .ToList();
         //}
 
-        public List<Student> GetStudentsEnrolledInMoreThan(int courseCount)
+        public async Task<List<Student>> GetStudentsEnrolledInMoreThanAsync(int courseCount)
         {
-            return _dbContext.Student
+            return await _dbContext.Student
                 .Where(s => s.Enrollments.Count() > courseCount) // navigation property used here
                 .Include(s => s.Enrollments)                     // optional: eager load enrollments
                 .ThenInclude(e => e.Course)                      // optional: include the courses too
-                .ToList();
+                .ToListAsync();
         }
 
     }

@@ -13,48 +13,48 @@ namespace StudentMangement.Services
             _enrollmentRepository = repo;
         }
 
-        public IEnumerable<Enrollment> GetEnrollments()
+        public async Task<IEnumerable<Enrollment>> GetEnrollments()
         {
-            return _enrollmentRepository.GetAll();
+            return await _enrollmentRepository.GetAllAsync();
         }
 
-        public Enrollment GetEnrollmentById(int id)
+        public async Task<Enrollment> GetEnrollmentById(int id)
         {
-            return _enrollmentRepository.GetById(id);
+            return await _enrollmentRepository.GetByIdAsync(id);
         }
 
-        public void SaveEnrollment(Enrollment enrollment)
+        public async Task SaveEnrollment(Enrollment enrollment)
         {
             if (enrollment.Id == 0)
             {
-                _enrollmentRepository.Add(enrollment);
+                await _enrollmentRepository.AddAsync(enrollment);
             }
             else
             {
                 _enrollmentRepository.Update(enrollment);
             }
-            _enrollmentRepository.Save();
+            await _enrollmentRepository.SaveChangesAsync();
         }
 
-        public void DeleteEnrollment(int id)
+        public async Task DeleteEnrollment(int id)
         {
-            _enrollmentRepository.Delete(id);
-            _enrollmentRepository.Save();
+            await _enrollmentRepository.DeleteAsync(id);
+            await _enrollmentRepository.SaveChangesAsync();
         }
 
-        public IEnumerable<Enrollment> GetEnrollmentsByCourse(int courseId)
+        public async Task<IEnumerable<Enrollment>> GetEnrollmentsByCourse(int courseId)
         {
-            return _enrollmentRepository.GetByCourseId(courseId);
+            return await _enrollmentRepository.GetByCourseIdAsync(courseId);
         }
 
-        public List<Student> GetStudentsInCourse(int courseId)
+        public async Task<List<Student>> GetStudentsInCourse(int courseId)
         {
-            return _enrollmentRepository.GetStudentsByCourse(courseId);
+            return await _enrollmentRepository.GetStudentsByCourseAsync(courseId);
         }
 
-        public List<Course> GetCoursesForStudent(int studentId)
+        public async Task<List<Course>> GetCoursesForStudent(int studentId)
         {
-            return _enrollmentRepository.GetCoursesByStudent(studentId);
+            return await _enrollmentRepository.GetCoursesByStudentAsync(studentId);
         }
 
     }

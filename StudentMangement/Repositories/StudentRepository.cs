@@ -1,4 +1,5 @@
-﻿using StudentMangement.Abstraction.Repositories;
+﻿using Microsoft.EntityFrameworkCore;
+using StudentMangement.Abstraction.Repositories;
 using StudentMangement.Data;
 using StudentMangement.Models;
 
@@ -13,19 +14,19 @@ namespace StudentMangement.Repositories
             _dbContext = dbContext;
         }
 
-        public IEnumerable<Student> GetAll()
+        public async Task<IEnumerable<Student>> GetAllAsync()
         {
-            return _dbContext.Student.ToList();
+            return await _dbContext.Student.ToListAsync();
         }
 
-        public Student GetById(int id)
+        public async Task<Student> GetByIdAsync(int id)
         {
-            return _dbContext.Student.FirstOrDefault(s => s.Id == id);
+            return await _dbContext.Student.FirstOrDefaultAsync(s => s.Id == id);
         }
 
-        public void Add(Student student)
+        public async Task AddAsync(Student student)
         {
-            _dbContext.Student.Add(student);
+            await _dbContext.Student.AddAsync(student);
         }
 
         public void Update(Student student)
@@ -33,16 +34,16 @@ namespace StudentMangement.Repositories
             _dbContext.Student.Update(student);
         }
 
-        public void Delete(int id)
+        public async Task DeleteAsync(int id)
         {
-            var student = GetById(id);
+            var student = await GetByIdAsync(id);
             if (student != null)
                 _dbContext.Student.Remove(student);
         }
 
-        public void Save()
+        public async Task SaveAsync()
         {
-            _dbContext.SaveChanges();
+            await _dbContext.SaveChangesAsync();
         }
     }
 }

@@ -4,12 +4,12 @@ namespace StudentMangement.Abstraction.Repositories
 {
     public interface ICourseRepository
     {
-        IEnumerable<Course> GetAll();
-        Course GetById(int id);
-        void Add(Course course);
+        Task<IEnumerable<Course>> GetAllAsync();
+        Task<Course> GetByIdAsync(int id);
+        Task AddAsync(Course course);
         void Update(Course course);
-        void Delete(int id);
-        void Save();
-        List<CourseStudentCountDto> GetStudentCountPerCourse();
+        Task DeleteAsync(int id);
+        Task SaveChangesAsync();
+        Task<List<CourseStudentCountDto>> GetStudentCountPerCourseAsync();
     }
 }

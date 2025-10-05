@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Mvc.Rendering;
 using StudentMangement.Abstraction.Services;
 using StudentMangement.Models;
-using StudentMangement.Services;
 
 namespace StudentMangement.Controllers
 {
@@ -19,28 +18,37 @@ namespace StudentMangement.Controllers
             _courseService = courseService;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            ViewBag.Students = _studentService.GetStudents();
-            ViewBag.Courses = _courseService.GetCourses();
-            var enrollments = _enrollmentService.GetEnrollments();
+            ViewBag.Students = await _studentService.GetStudentsAsync();
+            ViewBag.Courses = await _courseService.GetAllCourses();
+            var enrollments = await _enrollmentService.GetEnrollments();
             return View(enrollments);
         }
 
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-            ViewBag.Students = _studentService.GetStudents();
-            ViewBag.Courses = _courseService.GetCourses();
+            ViewBag.Students = _studentService.GetStudentsAsync();
+            ViewBag.Courses = await _courseService.GetAllCourses();
             var enrollment = new Enrollment();
             return View(enrollment);
         }
 
         [HttpPost]
-        public IActionResult Save([FromBody] Enrollment enrollment)
+        public async Task<IActionResult> Save([FromBody] Enrollment enrollment)
         {
             try
             {
-                _enrollmentService.SaveEnrollment(enrollment);
+                if (!ModelState.IsValid)
+                {
+                    var firstError = ModelState.Values
+                        .SelectMany(v => v.Errors)
+                        .Select(e => e.ErrorMessage)
+                        .FirstOrDefault();
+
+                    return BadRequest(new { Message = firstError });
+                }
+                await _enrollmentService.SaveEnrollment(enrollment);
                 return Ok(true);
             }
             catch
@@ -62,25 +70,25 @@ namespace StudentMangement.Controllers
             }
         }
 
-        public IActionResult StudentsInCourse(int? courseId)
+        public async Task<IActionResult> StudentsInCourse(int? courseId)
         {
-            var courses = _courseService.GetCourses();
+            var courses = await _courseService.GetAllCourses();
             ViewBag.Courses = new SelectList(courses, "Id", "Name", courseId);
 
             var students = courseId.HasValue
-                ? _enrollmentService.GetStudentsInCourse(courseId.Value)
+                ? await _enrollmentService.GetStudentsInCourse(courseId.Value)
                 : new List<Student>();
 
             return View(students);
         }
 
-        public IActionResult CoursesForStudent(int? studentId)
+        public async Task<IActionResult> CoursesForStudent(int? studentId)
         {
-            var students = _studentService.GetStudents();
+            var students = await _studentService.GetStudentsAsync();
             ViewBag.Students = new SelectList(students, "Id", "Name", studentId);
 
             var courses = studentId.HasValue
-                ? _enrollmentService.GetCoursesForStudent(studentId.Value)
+                ? await _enrollmentService.GetCoursesForStudent(studentId.Value)
                 : new List<Course>();
 
             return View(courses);

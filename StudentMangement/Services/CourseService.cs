@@ -1,7 +1,6 @@
 ﻿using StudentMangement.Abstraction.Repositories;
 using StudentMangement.Abstraction.Services;
 using StudentMangement.Models;
-using System.Collections.Generic;
 
 namespace StudentMangement.Services
 {
@@ -14,38 +13,38 @@ namespace StudentMangement.Services
             _courseRepository = repo;
         }
 
-        public IEnumerable<Course> GetCourses()
+        public async Task<IEnumerable<Course>> GetAllCourses()
         {
-            return _courseRepository.GetAll();
+            return await _courseRepository.GetAllAsync();
         }
 
-        public Course GetCourseById(int id)
+        public async Task<Course> GetCourseById(int id)
         {
-            return _courseRepository.GetById(id);
+            return await _courseRepository.GetByIdAsync(id);
         }
 
-        public void SaveCourse(Course course)
+        public async Task SaveCourse(Course course)
         {
             if (course.Id == 0)
             {
-                _courseRepository.Add(course);
+                await _courseRepository.AddAsync(course);
             }
             else
             {
                 _courseRepository.Update(course);
             }
-            _courseRepository.Save();
+            await _courseRepository.SaveChangesAsync();
         }
 
-        public void DeleteCourse(int id)
+        public async Task DeleteCourse(int id)
         {
-            _courseRepository.Delete(id);
-            _courseRepository.Save();
+            await _courseRepository.DeleteAsync(id);
+            await _courseRepository.SaveChangesAsync();
         }
 
-        public List<CourseStudentCountDto> GetStudentCountPerCourse()
+        public async Task<List<CourseStudentCountDto>> GetStudentCountPerCourse()
         {
-            return _courseRepository.GetStudentCountPerCourse();
+            return await _courseRepository.GetStudentCountPerCourseAsync();
         }
     }
 }

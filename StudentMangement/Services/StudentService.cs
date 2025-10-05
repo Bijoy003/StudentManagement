@@ -15,38 +15,38 @@ namespace StudentMangement.Services
             _enrollmentRepository = enrollmentRepository;
         }
 
-        public IEnumerable<Student> GetStudents()
+        public async Task<IEnumerable<Student>> GetStudentsAsync()
         {
-            return _studentRepository.GetAll();
+            return await _studentRepository.GetAllAsync();
         }
 
-        public Student GetStudentById(int id)
+        public async Task<Student> GetStudentByIdAsync(int id)
         {
-            return _studentRepository.GetById(id);
+            return await _studentRepository.GetByIdAsync(id);
         }
 
-        public void SaveStudent(Student student)
+        public async Task SaveStudentAsync(Student student)
         {
             if (student.Id == 0)
             {
-                _studentRepository.Add(student);
+                _studentRepository.AddAsync(student);
             }
             else
             {
                 _studentRepository.Update(student);
             }
-            _studentRepository.Save();
+            await _studentRepository.SaveAsync();
         }
 
-        public void DeleteStudent(int id)
+        public async Task DeleteStudentAsync(int id)
         {
-            _studentRepository.Delete(id);
-            _studentRepository.Save();
+            _studentRepository.DeleteAsync(id);
+            await _studentRepository.SaveAsync();
         }
 
-        public List<Student> GetStudentsEnrolledInMoreThan(int courseCount)
+        public async Task<List<Student>> GetStudentsEnrolledInMoreThan(int courseCount)
         {
-            return _enrollmentRepository.GetStudentsEnrolledInMoreThan(courseCount);
+            return await _enrollmentRepository.GetStudentsEnrolledInMoreThanAsync(courseCount);
         }
     }
 }
