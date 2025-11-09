@@ -19,7 +19,7 @@
             <div class="col">
                 <label class="mb-2">Student</label>
                 <select id="studentId" class="form-select">
-                    @foreach (var student in ViewBag.Students)
+                    @foreach (var student in (IEnumerable<StudentMangement.Models.Student>)ViewBag.Students)
                     {
                         <option value="@student.Id">@student.Name</option>
                     }

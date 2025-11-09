@@ -1,9 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using StudentMangement.Abstraction.Services;
 using StudentMangement.Models;
 
 namespace StudentMangement.Controllers
 {
+    [Authorize]
     public class StudentController : Controller
     {
         private readonly IStudentService _studentService;
@@ -77,9 +79,17 @@ namespace StudentMangement.Controllers
 
         public async Task<IActionResult> EnrolledInMoreThan(int courseCount = 2)
         {
-            var students = await _studentService.GetStudentsEnrolledInMoreThan(courseCount);
-            ViewBag.CourseCount = courseCount;
-            return View(students);
+            try
+            {
+                var students = await _studentService.GetStudentsEnrolledInMoreThan(courseCount);
+                ViewBag.CourseCount = courseCount;
+                return View(students);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred.");
+                return View("Error");
+            }
         }
     }
 }

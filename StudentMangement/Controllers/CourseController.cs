@@ -1,38 +1,58 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using StudentMangement.Abstraction.Services;
 using StudentMangement.Models;
 
 namespace StudentMangement.Controllers
 {
+    [Authorize]
     public class CourseController : Controller
     {
         private readonly ICourseService _courseService;
+        private readonly ILogger<CourseController> _logger;
 
-        public CourseController(ICourseService service)
+        public CourseController(ICourseService service, ILogger<CourseController> logger)
         {
             _courseService = service;
+            _logger = logger;
         }
 
         public async Task<IActionResult> Index()
         {
-            var courses = await _courseService.GetAllCourses();
-            return View(courses);
+            try
+            {
+                var courses = await _courseService.GetAllCourses();
+                return View(courses);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred.");
+                return View("Error");
+            }
         }
 
         public async Task<IActionResult> Create(int? id)
         {
-            Course course;
-
-            if (id == null)
+            try
             {
-                course = new Course();
-            }
-            else
-            {
-                course = await _courseService.GetCourseById(id.Value);
-            }
+                Course course;
 
-            return View(course);
+                if (id == null)
+                {
+                    course = new Course();
+                }
+                else
+                {
+                    course = await _courseService.GetCourseById(id.Value);
+                }
+
+                return View(course);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred.");
+                return View("Error");
+            }
         }
 
         [HttpPost]
@@ -52,8 +72,9 @@ namespace StudentMangement.Controllers
                 await _courseService.SaveCourse(course);
                 return Ok(true);
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "An error occurred.");
                 return Ok(false);
             }
         }
@@ -65,16 +86,25 @@ namespace StudentMangement.Controllers
                 await _courseService.DeleteCourse(id);
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "An error occurred.");
                 return false;
             }
         }
 
         public async Task<IActionResult> StudentCountPerCourse()
         {
-            var data = await _courseService.GetStudentCountPerCourse();
-            return View(data);
+            try
+            {
+                var data = await _courseService.GetStudentCountPerCourse();
+                return View(data);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred.");
+                return View("Error");
+            }
         }
     }
 }

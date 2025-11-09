@@ -91,7 +91,7 @@ namespace StudentMangement.Repositories
 
         public async Task<List<Student>> GetStudentsEnrolledInMoreThanAsync(int courseCount)
         {
-            return await _dbContext.Student
+            return await _dbContext.Students
                 .Where(s => s.Enrollments.Count() > courseCount) // navigation property used here
                 .Include(s => s.Enrollments)                     // optional: eager load enrollments
                 .ThenInclude(e => e.Course)                      // optional: include the courses too

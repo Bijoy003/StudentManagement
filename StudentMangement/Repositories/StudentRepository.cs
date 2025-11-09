@@ -16,29 +16,29 @@ namespace StudentMangement.Repositories
 
         public async Task<IEnumerable<Student>> GetAllAsync()
         {
-            return await _dbContext.Student.ToListAsync();
+            return await _dbContext.Students.ToListAsync();
         }
 
         public async Task<Student> GetByIdAsync(int id)
         {
-            return await _dbContext.Student.FirstOrDefaultAsync(s => s.Id == id);
+            return await _dbContext.Students.FirstOrDefaultAsync(s => s.Id == id);
         }
 
         public async Task AddAsync(Student student)
         {
-            await _dbContext.Student.AddAsync(student);
+            await _dbContext.Students.AddAsync(student);
         }
 
         public void Update(Student student)
         {
-            _dbContext.Student.Update(student);
+            _dbContext.Students.Update(student);
         }
 
         public async Task DeleteAsync(int id)
         {
             var student = await GetByIdAsync(id);
             if (student != null)
-                _dbContext.Student.Remove(student);
+                _dbContext.Students.Remove(student);
         }
 
         public async Task SaveAsync()

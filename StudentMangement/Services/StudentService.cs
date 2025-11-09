@@ -29,7 +29,7 @@ namespace StudentMangement.Services
         {
             if (student.Id == 0)
             {
-                _studentRepository.AddAsync(student);
+                await _studentRepository.AddAsync(student);
             }
             else
             {
@@ -40,7 +40,7 @@ namespace StudentMangement.Services
 
         public async Task DeleteStudentAsync(int id)
         {
-            _studentRepository.DeleteAsync(id);
+            await _studentRepository.DeleteAsync(id);
             await _studentRepository.SaveAsync();
         }
 
