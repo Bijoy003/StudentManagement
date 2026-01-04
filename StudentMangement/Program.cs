@@ -25,6 +25,7 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(
     builder.Configuration.GetConnectionString("DatabaseConnection")
     ));
+// Identity
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
     // Password settings
@@ -33,9 +34,13 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     options.Password.RequireLowercase = true;           // Require at least one lowercase letter
     options.Password.RequireUppercase = true;           // Require at least one uppercase letter
     options.Password.RequiredLength = 4;                // Minimum password length
+    options.SignIn.RequireConfirmedEmail = true;
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
+
+// Mailgun email service (IMPORTANT)
+builder.Services.AddHttpClient<IMailgunEmailService, MailgunEmailService>();
 
 builder.Services.ConfigureApplicationCookie(options =>
 {

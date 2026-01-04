@@ -32,6 +32,18 @@ namespace StudentMangement.Data
                     await userManager.AddToRoleAsync(admin, "Admin");
                 }
             }
+
+            // Create Admin user if it doesn't exist
+            var su = await userManager.FindByEmailAsync("bhugolbijoy003@gmail.com");
+            if (su == null)
+            {
+                su = new ApplicationUser { UserName = "bhugolbijoy003@gmail.com", Email = "bhugolbijoy003@gmail.com", FullName = "Super Admin User", EmailConfirmed = true };
+                var result = await userManager.CreateAsync(su, "Admin123"); // Password is hashed automatically
+                if (result.Succeeded)
+                {
+                    await userManager.AddToRoleAsync(su, "Admin");
+                }
+            }
         }
     }
 }

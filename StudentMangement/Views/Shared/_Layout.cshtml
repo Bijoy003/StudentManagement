@@ -26,6 +26,9 @@
                         <li class="nav-item">
                             <a class="nav-link" href="@Url.Action("Index", "Home")">Home</a>
                         </li>
+                        <li>
+                            <a class="nav-link" href="@Url.Action("Profile", "Account")">My Profile</a>
+                        </li>
                         @if (User.Identity.IsAuthenticated && User.IsInRole("Admin"))
                         {
                             <li class="nav-item">

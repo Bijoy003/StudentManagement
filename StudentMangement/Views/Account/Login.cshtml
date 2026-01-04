@@ -5,40 +5,100 @@
 
 <div class="container mt-5 d-flex justify-content-center">
     <div class="card shadow-sm p-4" style="max-width: 400px; width: 100%;">
+
         <div class="text-center mb-4">
             <h2 class="fw-bold">Student Management Login</h2>
-            <p class="text-muted">Enter your credentials to access the Home Page</p>
+
+            @if (!Model.IsMfaRequired)
+            {
+                <p class="text-muted">
+                    Enter your credentials to access the Home Page
+                </p>
+            }
+            else
+            {
+                <p class="text-muted">
+                    Enter the verification code sent to your email
+                </p>
+            }
         </div>
 
         <form asp-action="Login" method="post">
-            <!-- Email Input -->
-            <div class="mb-3">
-                <label asp-for="Email" class="form-label">Email</label>
-                <input asp-for="Email" class="form-control" placeholder="Enter your email" />
-                <span asp-validation-for="Email" class="text-danger"></span>
-            </div>
 
-            <!-- Password Input -->
-            <div class="mb-3">
-                <label asp-for="Password" class="form-label">Password</label>
-                <input asp-for="Password" type="password" class="form-control" placeholder="Enter your password" />
-                <span asp-validation-for="Password" class="text-danger"></span>
-            </div>
+            @* ---------- EMAIL + PASSWORD ---------- *@
+            @if (!Model.IsMfaRequired)
+            {
+                <div class="mb-3">
+                    <label asp-for="Email" class="form-label">Email</label>
+                    <input asp-for="Email" class="form-control" />
+                    <span asp-validation-for="Email" class="text-danger"></span>
+                </div>
 
-            <!-- Remember Me Checkbox -->
-            <div class="mb-3 form-check">
-                <input asp-for="RememberMe" class="form-check-input" id="RememberMeCheck" />
-                <label asp-for="RememberMe" class="form-check-label" for="RememberMeCheck">
-                    Remember Me
-                </label>
-            </div>
+                <div class="mb-3">
+                    <label asp-for="Password" class="form-label">Password</label>
+                    <input asp-for="Password"
+                           type="password"
+                           class="form-control" />
+                    <span asp-validation-for="Password" class="text-danger"></span>
+                </div>
 
-            <!-- Submit Button -->
-            <button type="submit" class="btn btn-primary w-100">Login</button>
+                <div class="mb-3 form-check">
+                    <input asp-for="RememberMe" class="form-check-input" />
+                    <label asp-for="RememberMe" class="form-check-label">
+                        Remember Me
+                    </label>
+                </div>
+            }
+
+            @* ---------- MFA ---------- *@
+            @if (Model.IsMfaRequired)
+            {
+                <input type="hidden" asp-for="IsMfaRequired" />
+
+                <div class="mb-3">
+                    <label asp-for="MfaCode" class="form-label">
+                        Verification Code
+                    </label>
+
+                    <input asp-for="MfaCode"
+                           class="form-control text-center"
+                           maxlength="6"
+                           inputmode="numeric"
+                           autocomplete="one-time-code"
+                           placeholder="6-digit code" />
+
+                    <span asp-validation-for="MfaCode"
+                          class="text-danger"></span>
+                </div>
+            }
+
+            <button type="submit" class="btn btn-primary w-100">
+                @(Model.IsMfaRequired ? "Verify Code" : "Login")
+            </button>
         </form>
 
-        <div class="text-center mt-3">
-            <small class="text-muted">Forgot your password? <a href="#">Reset here</a></small>
-        </div>
+        @* <form asp-controller="Account"
+              asp-action="ExternalLogin"
+              method="post">
+            <button type="submit"
+                    name="provider"
+                    value="Google"
+                    class="btn btn-danger">
+                Login with Google
+            </button>
+        </form> *@
+
+
+        @if (!Model.IsMfaRequired)
+        {
+            <div class="text-center mt-3">
+                <small class="text-muted">
+                    Forgot your password?
+                    <a asp-controller="Account" asp-action="ForgotPassword">
+                        Reset here
+                    </a>
+                </small>
+            </div>
+        }
     </div>
 </div>
