@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using QRCoder;
 using StudentManagement.Infrastructure.Data;
 using StudentManagement.Web.Models;
+using System.Drawing.Imaging;
 using System.Security.Claims;
 
 namespace StudentManagement.Web.Controllers
@@ -40,8 +42,15 @@ namespace StudentManagement.Web.Controllers
             // VERIFY MFA CODE
             if (model.IsMfaRequired)
             {
+                //var mfaResult = await _signInManager.TwoFactorSignInAsync(
+                //    TokenOptions.DefaultEmailProvider,
+                //    model.MfaCode!,
+                //    model.RememberMe,
+                //    rememberClient: false
+                //);
+
                 var mfaResult = await _signInManager.TwoFactorSignInAsync(
-                    TokenOptions.DefaultEmailProvider,
+                    TokenOptions.DefaultAuthenticatorProvider,
                     model.MfaCode!,
                     model.RememberMe,
                     rememberClient: false
@@ -64,14 +73,15 @@ namespace StudentManagement.Web.Controllers
 
             if (result.RequiresTwoFactor)
             {
-                var user = await _userManager.FindByEmailAsync(model.Email);
+                // Generate code and send email
+                //var user = await _userManager.FindByEmailAsync(model.Email);
 
-                var code = await _userManager.GenerateTwoFactorTokenAsync(
-                    user!,
-                    TokenOptions.DefaultEmailProvider
-                );
+                //var code = await _userManager.GenerateTwoFactorTokenAsync(
+                //    user!,
+                //    TokenOptions.DefaultEmailProvider
+                //);
 
-                await _emailService.SendMfaCodeHtmlAsync(user!.Email!, code);
+                //await _emailService.SendMfaCodeHtmlAsync(user!.Email!, code);
 
                 model.IsMfaRequired = true;
 
@@ -92,8 +102,11 @@ namespace StudentManagement.Web.Controllers
         [HttpPost]
         public async Task<IActionResult> VerifyMfa(LoginViewModel model)
         {
+            if (!ModelState.IsValid)
+                return View("Login", model);
+
             var result = await _signInManager.TwoFactorSignInAsync(
-                TokenOptions.DefaultEmailProvider,
+                TokenOptions.DefaultAuthenticatorProvider,
                 model.MfaCode!,
                 model.RememberMe,
                 rememberClient: false
@@ -257,10 +270,62 @@ namespace StudentManagement.Web.Controllers
             if (user == null)
                 return RedirectToAction("Login");
 
+            // Reset and generate new authenticator key
+            await _userManager.ResetAuthenticatorKeyAsync(user);
+
+            var key = await _userManager.GetAuthenticatorKeyAsync(user);
+
+            // Build QR Code URI (TOTP standard)
+            var appName = "StudentManagement";
+            var email = user.Email;
+
+            var qrCodeUri =
+                $"otpauth://totp/{appName}:{email}?secret={key}&issuer={appName}&digits=6";
+
+            var model = new MyProfileViewModel
+            {
+                Email = email!,
+                IsTwoFactorEnabled = false,
+                ShowAuthenticatorSetup = true,
+                SharedKey = key!,
+                QrCodeUri = qrCodeUri
+            };
+
+            return View("Profile", model);
+        }
+
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ConfirmAuthenticator(MyProfileViewModel model)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+                return RedirectToAction("Login");
+
+            var isValid = await _userManager.VerifyTwoFactorTokenAsync(
+                user,
+                TokenOptions.DefaultAuthenticatorProvider,
+                model.MfaCode!
+            );
+
+            if (!isValid)
+            {
+                ModelState.AddModelError("", "Invalid verification code");
+                model.ShowAuthenticatorSetup = true;
+                return View("Profile", model);
+            }
+
+            // ENABLE ONLY AFTER SUCCESSFUL VERIFICATION
             await _userManager.SetTwoFactorEnabledAsync(user, true);
 
-            return RedirectToAction(nameof(Profile));
+            // (Optional)
+            //await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 5);
+
+            TempData["SuccessMessage"] = "Two-factor authentication enabled successfully.";
+            return RedirectToAction("Profile");
         }
+
 
         [Authorize]
         [HttpPost]
@@ -272,8 +337,10 @@ namespace StudentManagement.Web.Controllers
                 return RedirectToAction("Login");
 
             await _userManager.SetTwoFactorEnabledAsync(user, false);
+            await _userManager.ResetAuthenticatorKeyAsync(user);
 
-            return RedirectToAction(nameof(Profile));
+            TempData["SuccessMessage"] = "Two-factor authentication disabled.";
+            return RedirectToAction("Profile");
         }
 
         [Authorize]
@@ -377,6 +444,23 @@ namespace StudentManagement.Web.Controllers
                 _logger.LogError(ex, "Error while fetching courses");
                 return View("Error");
             }
+        }
+
+        [HttpGet]
+        public IActionResult QrCode(string uri)
+        {
+            if (string.IsNullOrWhiteSpace(uri))
+                return BadRequest();
+
+            using var qrGenerator = new QRCodeGenerator();
+            using var qrData = qrGenerator.CreateQrCode(uri, QRCodeGenerator.ECCLevel.Q);
+            using var qrCode = new QRCode(qrData);
+            using var bitmap = qrCode.GetGraphic(20);
+
+            using var ms = new MemoryStream();
+            bitmap.Save(ms, ImageFormat.Png);
+
+            return File(ms.ToArray(), "image/png");
         }
 
         private IActionResult RedirectToLocal(string? returnUrl)

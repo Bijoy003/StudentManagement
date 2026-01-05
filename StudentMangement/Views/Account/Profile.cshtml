@@ -106,6 +106,61 @@
 
     <hr />
 
+    @if (Model.ShowAuthenticatorSetup && !Model.IsTwoFactorEnabled)
+    {
+        <div class="row mt-3">
+            <div class="col-md-12">
+                <h5>Set up an authenticator app</h5>
+
+                <p class="text-muted">
+                    Scan the QR code using Google Authenticator, Microsoft Authenticator,
+                    or any compatible app.
+                </p>
+            </div>
+        </div>
+
+        <div class="row align-items-center mt-3">
+            <div class="col-md-4 text-center">
+                <img src="/Account/QrCode?uri=@Model.QrCodeUri"
+                     alt="Authenticator QR Code"
+                     class="img-fluid border p-2" />
+            </div>
+
+            <div class="col-md-8">
+                <p class="mb-2">
+                    If you can’t scan the QR code, enter this key manually:
+                </p>
+
+                <div class="alert alert-secondary font-monospace">
+                    @Model.SharedKey
+                </div>
+
+                <form asp-action="ConfirmAuthenticator"
+                      asp-controller="Account"
+                      method="post">
+                    @Html.AntiForgeryToken()
+
+                    <div class="mb-3">
+                        <label class="form-label">
+                            Verification code
+                        </label>
+                        <input asp-for="MfaCode"
+                               class="form-control"
+                               placeholder="6-digit code"
+                               autocomplete="one-time-code"
+                               required />
+                    </div>
+
+                    <button type="submit" class="btn btn-success">
+                        Verify & Enable 2FA
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <hr />
+    }
+
     <div class="d-flex gap-2">
         <a asp-action="ChangePassword"
            asp-controller="Account"

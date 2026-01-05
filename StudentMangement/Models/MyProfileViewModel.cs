@@ -14,5 +14,11 @@ namespace StudentManagement.Web.Models
 
         // 2FA
         public bool IsTwoFactorEnabled { get; set; }
+
+        // Authenticator setup
+        public bool ShowAuthenticatorSetup { get; set; }    // controls QR visibility
+        public string? SharedKey { get; set; }              // manual entry key
+        public string? QrCodeUri { get; set; }              // otpauth:// URI
+        public string? MfaCode { get; set; }                // user-entered 6-digit code
     }
 }
