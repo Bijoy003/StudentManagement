@@ -1,10 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using StudentManagement.Models;
 using StudentMangement.Data;
+using StudentMangement.Web.Models;
 
-namespace StudentManagement.Controllers
+namespace StudentMangement.Web.Controllers
 {
     [Authorize(Roles = "Admin")]
     public class AdminController : Controller

@@ -1,4 +1,4 @@
-﻿namespace StudentManagement.Models
+﻿namespace StudentMangement.Web.Models
 {
     public class LoginViewModel
     {

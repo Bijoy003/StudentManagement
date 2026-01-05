@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using StudentMangement.Abstraction.Services;
 using StudentMangement.Models;
 
-namespace StudentMangement.Controllers
+namespace StudentMangement.Web.Controllers
 {
     [Authorize]
     public class EnrollmentController : Controller

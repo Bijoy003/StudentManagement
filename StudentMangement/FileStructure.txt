@@ -1,0 +1,50 @@
+﻿StudentManagement
+├── Properties
+├── wwwroot
+├── Abstraction
+│	└── Repositories
+│	│	├── ICourseRepository
+│	│	├── IEnrollmentRepository
+│	│	└── IStudentRepository
+│	└── Services
+│		├── ICourseService
+│		├── IEnrollmentService
+│		├── IMaingunEmailService
+│		├── IPrimeNumberService
+│		└── IStudentService
+├── Controllers
+│	├── AccountController
+│	├── AdminController
+│	├── CourseController
+│	├── EnrollmentController
+│	├── HomeController
+│	└── StudentController
+├── Data
+│	├── ApplicationDbContext
+│	└── DbInitializer
+├── MIgrations 
+├── Models 
+│	├── ChangePasswordViewModel
+│	├── Course
+│	├── CourseStudentCountDto
+│	├── CreateUserViewModel
+│	├── Enrollment
+│	├── ErrorViewModel
+│	├── ForgotPasswordViewModel
+│	├── LoginViewModel
+│	├── MyProfileViewModel
+│	├── ResetPasswordViewModel
+│	└── Student
+├── Repositories 
+│	├── CourseRepository
+│	├── EnrollmentRepository
+│	└── StudentRepository
+├── Services 
+│	├── CourseService
+│	├── EnrollmentService
+│	├── MailgunEmailService
+│	├── PrimeNumberService
+│	└── StudentService
+├── Views 
+├── appsettings 
+└── Program.cs

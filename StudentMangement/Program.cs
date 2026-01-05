@@ -1,11 +1,11 @@
 using AspNetCoreRateLimit;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using StudentMangement.Abstraction.Repositories;
-using StudentMangement.Abstraction.Services;
-using StudentMangement.Data;
-using StudentMangement.Repositories;
-using StudentMangement.Services;
+using StudentManagement.Application.Interfaces;
+using StudentManagement.Application.Services;
+using StudentManagement.Domain.Interfaces;
+using StudentManagement.Infrastructure.Data;
+using StudentManagement.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 

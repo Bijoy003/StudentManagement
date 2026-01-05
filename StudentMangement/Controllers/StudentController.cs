@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using StudentMangement.Abstraction.Services;
 using StudentMangement.Models;
 
-namespace StudentMangement.Controllers
+namespace StudentMangement.Web.Controllers
 {
     [Authorize]
     public class StudentController : Controller
