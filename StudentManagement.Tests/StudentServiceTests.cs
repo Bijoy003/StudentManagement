@@ -1,8 +1,8 @@
 using Moq;
-using StudentMangement.Abstraction.Repositories;
-using StudentMangement.Abstraction.Services;
-using StudentMangement.Models;
-using StudentMangement.Services;
+using StudentManagement.Application.Interfaces;
+using StudentManagement.Application.Services;
+using StudentManagement.Domain.Entities;
+using StudentManagement.Domain.Interfaces;
 
 namespace StudentManagement.Tests
 {

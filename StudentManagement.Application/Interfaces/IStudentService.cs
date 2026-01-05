@@ -1,4 +1,4 @@
-﻿using StudentMangement.Models;
+﻿using StudentManagement.Domain.Entities;
 
 namespace StudentManagement.Application.Interfaces
 {

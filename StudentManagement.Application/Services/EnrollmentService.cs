@@ -1,6 +1,6 @@
 ﻿using StudentManagement.Application.Interfaces;
-using StudentMangement.Abstraction.Repositories;
-using StudentMangement.Models;
+using StudentManagement.Domain.Entities;
+using StudentManagement.Domain.Interfaces;
 
 namespace StudentManagement.Application.Services
 {

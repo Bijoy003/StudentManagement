@@ -1,4 +1,4 @@
-﻿using StudentManagement.Application.DTOs;
+﻿using StudentManagement.Domain.DTOs;
 using StudentManagement.Domain.Entities;
 
 namespace StudentManagement.Application.Interfaces

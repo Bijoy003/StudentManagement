@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace StudentMangement.Web.Models
+namespace StudentManagement.Web.Models
 {
     public class ChangePasswordViewModel
     {

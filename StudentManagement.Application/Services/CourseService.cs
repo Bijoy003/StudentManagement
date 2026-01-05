@@ -1,5 +1,5 @@
-﻿using StudentManagement.Application.DTOs;
-using StudentManagement.Application.Interfaces;
+﻿using StudentManagement.Application.Interfaces;
+using StudentManagement.Domain.DTOs;
 using StudentManagement.Domain.Entities;
 using StudentManagement.Domain.Interfaces;
 

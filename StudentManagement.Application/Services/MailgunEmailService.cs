@@ -1,4 +1,5 @@
-﻿using StudentManagement.Application.Interfaces;
+﻿using Microsoft.Extensions.Configuration;
+using StudentManagement.Application.Interfaces;
 using System.Net.Http.Headers;
 
 namespace StudentManagement.Application.Services

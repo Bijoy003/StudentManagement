@@ -1,5 +1,5 @@
-using StudentMangement.Abstraction.Services;
-using StudentMangement.Services;
+using StudentManagement.Application.Interfaces;
+using StudentManagement.Application.Services;
 
 namespace StudentManagement.Tests
 {

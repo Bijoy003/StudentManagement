@@ -1,12 +1,11 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using StudentMangement.Abstraction.Services;
-using StudentMangement.Data;
-using StudentMangement.Web.Models;
+using StudentManagement.Infrastructure.Data;
+using StudentManagement.Web.Models;
 using System.Security.Claims;
 
-namespace StudentMangement.Web.Controllers
+namespace StudentManagement.Web.Controllers
 {
     public class AccountController : Controller
     {

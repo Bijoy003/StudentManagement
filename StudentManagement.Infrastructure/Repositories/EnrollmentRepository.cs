@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using StudentManagement.Domain.Entities;
+using StudentManagement.Domain.Interfaces;
 using StudentManagement.Infrastructure.Data;
-using StudentMangement.Abstraction.Repositories;
-using StudentMangement.Models;
 
 namespace StudentManagement.Infrastructure.Repositories
 {

@@ -1,4 +1,4 @@
-﻿namespace StudentManagement.Application.DTOs
+﻿namespace StudentManagement.Domain.DTOs
 {
     public class CourseStudentCountDto
     {

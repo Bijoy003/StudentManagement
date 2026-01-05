@@ -1,9 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using StudentMangement.Abstraction.Services;
-using StudentMangement.Models;
 
-namespace StudentMangement.Web.Controllers
+namespace StudentManagement.Web.Controllers
 {
     [Authorize]
     public class StudentController : Controller
