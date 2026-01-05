@@ -1,0 +1,3 @@
+[submodule "StudentManagement.Domain"]
+	path = StudentManagement.Domain
+	url = https://github.com/your-org/StudentManagement.Domain.git
