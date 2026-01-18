@@ -1,6 +1,7 @@
 using AspNetCoreRateLimit;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using StudentManagement.Application.Services;
 using StudentManagement.Domain.Interfaces;
 using StudentManagement.Infrastructure.Data;
@@ -84,6 +85,31 @@ using (var scope = app.Services.CreateScope())
 app.UseIpRateLimiting();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+//app.UseStaticFiles(new StaticFileOptions
+//{
+//    FileProvider = new PhysicalFileProvider(
+//        Path.Combine(builder.Environment.ContentRootPath, "wwwroot/images")),
+//    RequestPath = "/images",
+//    OnPrepareResponse = ctx =>
+//    {
+//        ctx.Context.Response.Headers["Cache-Control"] =
+//            "public,max-age=604800"; // 7 days
+//    }
+//});
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(
+        Path.Combine(builder.Environment.ContentRootPath, "wwwroot/css")),
+    RequestPath = "/css",
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers["Cache-Control"] =
+            "public,max-age=86400"; // 1 day
+    }
+});
+
 
 app.UseRouting();
 
