@@ -75,11 +75,44 @@ else
     app.UseDeveloperExceptionPage(); // Shows detailed errors in dev
 }
 
-// Seed Admin user and roles
+// --- MIGRATION AND SEEDING BLOCKS ---
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
-    await DbInitializer.SeedAdmin(services);
+    var logger = services.GetRequiredService<ILogger<Program>>();
+    var context = services.GetRequiredService<ApplicationDbContext>();
+
+    int retryCount = 0;
+    int maxRetries = 10;
+
+    while (retryCount < maxRetries)
+    {
+        try
+        {
+            logger.LogInformation("Connecting to database (Attempt {Attempt}/{MaxRetries})...", retryCount + 1, maxRetries);
+
+            // 1. Run Migrations
+            await context.Database.MigrateAsync();
+
+            // 2. Run Seeding
+            await DbInitializer.SeedAdmin(services);
+
+            logger.LogInformation("Database migration and seeding successful.");
+            break; // Success! Exit the loop.
+        }
+        catch (Exception ex)
+        {
+            retryCount++;
+            if (retryCount >= maxRetries)
+            {
+                logger.LogCritical(ex, "Could not connect to database after {MaxRetries} attempts. Application is shutting down.", maxRetries);
+                throw;
+            }
+
+            logger.LogWarning("Database not ready yet (Name or service not known). Retrying in 5 seconds...");
+            await Task.Delay(5000); // Wait 5 seconds before trying again
+        }
+    }
 }
 
 app.UseIpRateLimiting();
