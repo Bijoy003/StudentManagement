@@ -26,7 +26,7 @@ namespace StudentManagement.Infrastructure.Data
             var admin = await userManager.FindByEmailAsync("admin@admin.com");
             if (admin == null)
             {
-                admin = new ApplicationUser { UserName = "admin@admin.com", Email = "admin@admin.com", FullName = "Admin User" };
+                admin = new ApplicationUser { UserName = "admin@admin.com", Email = "admin@admin.com", FullName = "Admin User", EmailConfirmed = true };
                 var result = await userManager.CreateAsync(admin, "Admin123"); // Password is hashed automatically
                 if (result.Succeeded)
                 {
