@@ -10,7 +10,7 @@ using StudentManagement.Infrastructure.Data;
 
 #nullable disable
 
-namespace StudentMangement.Migrations
+namespace StudentManagement.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
     [Migration("20250817152747_AddStudentCourseRelationships")]
@@ -25,7 +25,7 @@ namespace StudentMangement.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder, 1L, 1);
 
-            modelBuilder.Entity("StudentMangement.Models.Course", b =>
+            modelBuilder.Entity("StudentManagement.Models.Course", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -45,7 +45,7 @@ namespace StudentMangement.Migrations
                     b.ToTable("Courses");
                 });
 
-            modelBuilder.Entity("StudentMangement.Models.Enrollment", b =>
+            modelBuilder.Entity("StudentManagement.Models.Enrollment", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -71,7 +71,7 @@ namespace StudentMangement.Migrations
                     b.ToTable("Enrollments");
                 });
 
-            modelBuilder.Entity("StudentMangement.Models.Student", b =>
+            modelBuilder.Entity("StudentManagement.Models.Student", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -99,15 +99,15 @@ namespace StudentMangement.Migrations
                     b.ToTable("Student");
                 });
 
-            modelBuilder.Entity("StudentMangement.Models.Enrollment", b =>
+            modelBuilder.Entity("StudentManagement.Models.Enrollment", b =>
                 {
-                    b.HasOne("StudentMangement.Models.Course", "Course")
+                    b.HasOne("StudentManagement.Models.Course", "Course")
                         .WithMany("Enrollments")
                         .HasForeignKey("CourseId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("StudentMangement.Models.Student", "Student")
+                    b.HasOne("StudentManagement.Models.Student", "Student")
                         .WithMany("Enrollments")
                         .HasForeignKey("StudentId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -118,12 +118,12 @@ namespace StudentMangement.Migrations
                     b.Navigation("Student");
                 });
 
-            modelBuilder.Entity("StudentMangement.Models.Course", b =>
+            modelBuilder.Entity("StudentManagement.Models.Course", b =>
                 {
                     b.Navigation("Enrollments");
                 });
 
-            modelBuilder.Entity("StudentMangement.Models.Student", b =>
+            modelBuilder.Entity("StudentManagement.Models.Student", b =>
                 {
                     b.Navigation("Enrollments");
                 });

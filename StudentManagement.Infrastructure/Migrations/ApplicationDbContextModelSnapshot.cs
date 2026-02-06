@@ -9,7 +9,7 @@ using StudentManagement.Infrastructure.Data;
 
 #nullable disable
 
-namespace StudentMangement.Migrations
+namespace StudentManagement.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
     partial class ApplicationDbContextModelSnapshot : ModelSnapshot
@@ -156,7 +156,7 @@ namespace StudentMangement.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("StudentMangement.Data.ApplicationUser", b =>
+            modelBuilder.Entity("StudentManagement.Data.ApplicationUser", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
@@ -225,7 +225,7 @@ namespace StudentMangement.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
-            modelBuilder.Entity("StudentMangement.Models.Course", b =>
+            modelBuilder.Entity("StudentManagement.Models.Course", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -245,7 +245,7 @@ namespace StudentMangement.Migrations
                     b.ToTable("Courses");
                 });
 
-            modelBuilder.Entity("StudentMangement.Models.Enrollment", b =>
+            modelBuilder.Entity("StudentManagement.Models.Enrollment", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -271,7 +271,7 @@ namespace StudentMangement.Migrations
                     b.ToTable("Enrollments");
                 });
 
-            modelBuilder.Entity("StudentMangement.Models.Student", b =>
+            modelBuilder.Entity("StudentManagement.Models.Student", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -316,7 +316,7 @@ namespace StudentMangement.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
                 {
-                    b.HasOne("StudentMangement.Data.ApplicationUser", null)
+                    b.HasOne("StudentManagement.Data.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -325,7 +325,7 @@ namespace StudentMangement.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
                 {
-                    b.HasOne("StudentMangement.Data.ApplicationUser", null)
+                    b.HasOne("StudentManagement.Data.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -340,7 +340,7 @@ namespace StudentMangement.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("StudentMangement.Data.ApplicationUser", null)
+                    b.HasOne("StudentManagement.Data.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -349,22 +349,22 @@ namespace StudentMangement.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
                 {
-                    b.HasOne("StudentMangement.Data.ApplicationUser", null)
+                    b.HasOne("StudentManagement.Data.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("StudentMangement.Models.Enrollment", b =>
+            modelBuilder.Entity("StudentManagement.Models.Enrollment", b =>
                 {
-                    b.HasOne("StudentMangement.Models.Course", "Course")
+                    b.HasOne("StudentManagement.Models.Course", "Course")
                         .WithMany()
                         .HasForeignKey("CourseId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("StudentMangement.Models.Student", "Student")
+                    b.HasOne("StudentManagement.Models.Student", "Student")
                         .WithMany("Enrollments")
                         .HasForeignKey("StudentId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -375,7 +375,7 @@ namespace StudentMangement.Migrations
                     b.Navigation("Student");
                 });
 
-            modelBuilder.Entity("StudentMangement.Models.Student", b =>
+            modelBuilder.Entity("StudentManagement.Models.Student", b =>
                 {
                     b.Navigation("Enrollments");
                 });

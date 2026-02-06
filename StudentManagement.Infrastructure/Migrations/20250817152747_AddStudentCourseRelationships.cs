@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace StudentMangement.Migrations
+namespace StudentManagement.Migrations
 {
     public partial class AddStudentCourseRelationships : Migration
     {

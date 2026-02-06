@@ -10,7 +10,7 @@ using StudentManagement.Infrastructure.Data;
 
 #nullable disable
 
-namespace StudentMangement.Migrations
+namespace StudentManagement.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
     [Migration("20231216072534_AddStudentToDatabase")]
@@ -25,7 +25,7 @@ namespace StudentMangement.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder, 1L, 1);
 
-            modelBuilder.Entity("StudentMangement.Models.Student", b =>
+            modelBuilder.Entity("StudentManagement.Models.Student", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
