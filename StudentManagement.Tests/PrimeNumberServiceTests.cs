@@ -30,6 +30,6 @@ namespace StudentManagement.Tests
 
         [Fact]
         public void GetNthPrime_TenthPrime_ShouldReturn31() =>
-            Assert.Equal(34, _primeNumberService.GetNthPrime(10));
+            Assert.Equal(31, _primeNumberService.GetNthPrime(11));
     }
 }

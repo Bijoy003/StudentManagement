@@ -12,15 +12,13 @@ namespace StudentManagement.Tests
         public async Task GetStudentByIdAsync_ExistingId_ReturnsStudent()
         {
             // Arrange
-            var mockRepo = new Mock<IStudentService>();
-            mockRepo.Setup(r => r.GetStudentByIdAsync(1))
-                    .ReturnsAsync(new Student { Id = 1, Name = "John Doe" });
-
             var mockStudentRepo = new Mock<IStudentRepository>();
             var mockEnrollmentRepo = new Mock<IEnrollmentRepository>();
 
-            var service = new StudentService(mockStudentRepo.Object, mockEnrollmentRepo.Object);
+            mockStudentRepo.Setup(r => r.GetByIdAsync(1))
+                           .ReturnsAsync(new Student { Id = 1, Name = "John Doe" });
 
+            var service = new StudentService(mockStudentRepo.Object, mockEnrollmentRepo.Object);
 
             // Act
             var student = await service.GetStudentByIdAsync(1);
@@ -42,6 +40,49 @@ namespace StudentManagement.Tests
 
             // Act & Assert
             Assert.ThrowsAsync<Exception>(() => service.GetStudentByIdAsync(999));
+        }
+
+        [Fact]
+        public async Task Service_Should_Handle_Concurrent_Calls()
+        {
+            var mockStudentRepo = new Mock<IStudentRepository>();
+            var mockEnrollmentRepo = new Mock<IEnrollmentRepository>();
+
+            mockStudentRepo.Setup(r => r.GetByIdAsync(It.IsAny<int>()))
+                           .ReturnsAsync(new Student { Id = 1, Name = "John" });
+
+            var service = new StudentService(mockStudentRepo.Object, mockEnrollmentRepo.Object);
+
+            var tasks = Enumerable.Range(0, 1000)
+                                  .Select(_ => service.GetStudentByIdAsync(1));
+
+            var results = await Task.WhenAll(tasks);
+
+            Assert.All(results, r => Assert.Equal("John", r.Name));
+        }
+
+        [Fact]
+        public async Task Service_Waits_For_Repository()
+        {
+            var tcs = new TaskCompletionSource<Student?>();
+
+            var mockRepo = new Mock<IStudentRepository>();
+            var mockEnrollmentRepo = new Mock<IEnrollmentRepository>();
+
+            mockRepo.Setup(r => r.GetByIdAsync(1))
+                    .Returns(tcs.Task);
+
+            var service = new StudentService(mockRepo.Object, mockEnrollmentRepo.Object);
+
+            var task = service.GetStudentByIdAsync(1);
+
+            Assert.False(task.IsCompleted);
+
+            tcs.SetResult(new Student { Id = 1, Name = "John" });
+
+            var result = await task;
+
+            Assert.Equal("John", result?.Name);
         }
     }
 
