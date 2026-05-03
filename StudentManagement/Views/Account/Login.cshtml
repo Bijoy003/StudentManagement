@@ -77,16 +77,16 @@
             </button>
         </form>
 
-        @* <form asp-controller="Account"
-              asp-action="ExternalLogin"
-              method="post">
+        <form asp-controller="Account"
+                asp-action="ExternalLogin"
+                method="post">
             <button type="submit"
                     name="provider"
                     value="Google"
-                    class="btn btn-danger">
+                    class="btn btn-danger mt-3">
                 Login with Google
             </button>
-        </form> *@
+        </form>
 
 
         @if (!Model.IsMfaRequired)

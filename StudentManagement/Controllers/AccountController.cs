@@ -404,6 +404,12 @@ namespace StudentManagement.Web.Controllers
 
             if (signInResult.Succeeded)
                 return RedirectToLocal(returnUrl);
+            if (signInResult.IsNotAllowed)
+            {
+                // e.g. Email not confirmed
+                return RedirectToAction(nameof(AccessDenied));
+            }
+
 
             var email = info.Principal.FindFirstValue(ClaimTypes.Email);
             if (email == null)
@@ -471,5 +477,17 @@ namespace StudentManagement.Web.Controllers
             return RedirectToAction("Index", "Home");
         }
 
+        [HttpGet]
+        public IActionResult AccessDenied(string? returnUrl = null)
+        {
+            ViewData["ReturnUrl"] = returnUrl;
+            return View();
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> RedirectToLogin()
+        {
+            return RedirectToAction(nameof(Login));
+        }
     }
 }

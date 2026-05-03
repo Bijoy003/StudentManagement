@@ -5,7 +5,7 @@ namespace StudentManagement.Web.Controllers
 {
     public class HomeController : Controller
     {
-        [Authorize(Roles = "Admin")]
+        [Authorize]
         public IActionResult Index()
         {
             return View();
