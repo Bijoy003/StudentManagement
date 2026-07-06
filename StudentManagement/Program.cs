@@ -1,16 +1,24 @@
 using AspNetCoreRateLimit;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.FileProviders;
+using OpenAI;
+using OpenAI.Chat;
+using StudentManagement.Application.Interfaces;
 using StudentManagement.Application.Services;
 using StudentManagement.Domain.Interfaces;
 using StudentManagement.Infrastructure.Data;
 using StudentManagement.Infrastructure.Repositories;
+using System.ClientModel;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add in-memory caching
 builder.Services.AddMemoryCache();
+
+builder.Configuration
+    .AddJsonFile(builder.Configuration["AdditionalConfig:Path"], optional: false, reloadOnChange: true);
 
 // Load configuration
 builder.Services.Configure<IpRateLimitOptions>(
@@ -34,7 +42,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     options.Password.RequireLowercase = true;           // Require at least one lowercase letter
     options.Password.RequireUppercase = true;           // Require at least one uppercase letter
     options.Password.RequiredLength = 4;                // Minimum password length
-    options.SignIn.RequireConfirmedEmail = true;
+    options.SignIn.RequireConfirmedEmail = false;       // Set it to false to enable login with google without confirmation
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
@@ -64,8 +72,27 @@ builder.Services.AddScoped<ICourseService, CourseService>();
 builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IPrimeNumberService, PrimeNumberService>();
 
+builder.Services.AddChatClient(services =>
+{
+    var config = services.GetRequiredService<IConfiguration>();
+    var endpoint = config["LmStudio:Endpoint"] ?? "http://127.0.0.1:1234";
+    if (!endpoint.EndsWith("/v1", StringComparison.OrdinalIgnoreCase))
+    {
+        endpoint = $"{endpoint.TrimEnd('/')}/v1";
+    }
 
+    var model = config["LmStudio:Model"] ?? "local-model";
+    var apiKey = config["LmStudio:ApiKey"] ?? "lmstudio";
 
+    return new ChatClient(
+        model,
+        new ApiKeyCredential(apiKey),
+        new OpenAIClientOptions { Endpoint = new Uri(endpoint) })
+        .AsIChatClient();
+})
+.UseLogging();
+
+builder.Services.AddScoped<IChatService, ChatService>();
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
@@ -153,6 +180,7 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(

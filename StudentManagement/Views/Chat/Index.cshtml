@@ -1,0 +1,39 @@
+@{
+    ViewData["Title"] = "Chat";
+}
+
+@section Breadcrumb
+{
+    <li class="breadcrumb-item"><a href="@Url.Action("Index", "Home")">Home</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Chat</li>
+}
+
+@section Head
+{
+    <link rel="stylesheet" href="~/css/chat.css" asp-append-version="true" />
+}
+
+<div class="m-3">
+    <h3><b>Chat Assistant</b></h3>
+    <p class="text-muted">Ask questions about the Student Management application. Powered by your local LM Studio model.</p>
+</div>
+
+<div class="container border rounded p-3 chat-container">
+    <div id="chat-messages" class="border rounded p-3 mb-3 bg-light chat-messages">
+    </div>
+
+    <div id="chat-loading" class="text-muted mb-2 d-none">
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        Thinking...
+    </div>
+
+    <div class="input-group">
+        <input type="text" id="chat-input" class="form-control" placeholder="Type your message..." autocomplete="off" />
+        <button type="button" id="chat-send" class="btn btn-primary">Send</button>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="~/js/chat.js" asp-append-version="true"></script>
+}
