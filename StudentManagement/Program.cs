@@ -1,16 +1,13 @@
 using AspNetCoreRateLimit;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.FileProviders;
-using OpenAI;
-using OpenAI.Chat;
 using StudentManagement.Application.Interfaces;
+using StudentManagement.Configuration;
 using StudentManagement.Application.Services;
 using StudentManagement.Domain.Interfaces;
 using StudentManagement.Infrastructure.Data;
 using StudentManagement.Infrastructure.Repositories;
-using System.ClientModel;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -72,26 +69,10 @@ builder.Services.AddScoped<ICourseService, CourseService>();
 builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IPrimeNumberService, PrimeNumberService>();
 
-builder.Services.AddChatClient(services =>
-{
-    var config = services.GetRequiredService<IConfiguration>();
-    var endpoint = config["LmStudio:Endpoint"] ?? "http://127.0.0.1:1234";
-    if (!endpoint.EndsWith("/v1", StringComparison.OrdinalIgnoreCase))
-    {
-        endpoint = $"{endpoint.TrimEnd('/')}/v1";
-    }
+builder.Services.AddAppChatClient(builder.Configuration);
 
-    var model = config["LmStudio:Model"] ?? "local-model";
-    var apiKey = config["LmStudio:ApiKey"] ?? "lmstudio";
-
-    return new ChatClient(
-        model,
-        new ApiKeyCredential(apiKey),
-        new OpenAIClientOptions { Endpoint = new Uri(endpoint) })
-        .AsIChatClient();
-})
-.UseLogging();
-
+builder.Services.AddSingleton<IAppKnowledgeService, AppKnowledgeService>();
+builder.Services.AddScoped<ChatTools>();
 builder.Services.AddScoped<IChatService, ChatService>();
 var app = builder.Build();
 

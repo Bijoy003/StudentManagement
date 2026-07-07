@@ -48,7 +48,7 @@ async function sendMessage() {
         appendMessage('assistant', data.reply);
         chatHistory.push({ role: 'assistant', text: data.reply });
     } catch (error) {
-        toastr.error('The chat service is currently unavailable. Please ensure LM Studio is running with the local server enabled.');
+        toastr.error('The chat service is currently unavailable. Please ensure your local AI server is running and configured correctly.');
         chatHistory.pop();
     } finally {
         setInputEnabled(true);

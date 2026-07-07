@@ -48,8 +48,8 @@ namespace StudentManagement.Web.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to get chat reply from LM Studio.");
-                return StatusCode(503, new { error = "The chat service is currently unavailable. Please ensure LM Studio is running with the local server enabled." });
+                _logger.LogError(ex, "Failed to get chat reply from the configured AI provider.");
+                return StatusCode(503, new { error = "The chat service is currently unavailable. Please ensure your local AI server (Ollama, LM Studio, etc.) is running and the Chat settings in appsettings are correct." });
             }
         }
 
