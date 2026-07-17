@@ -13,6 +13,9 @@ public static class ChatClientServiceCollectionExtensions
     {
         services.Configure<ChatOptions>(configuration.GetSection(ChatOptions.SectionName));
         services.Configure<ChatFeatureOptions>(configuration.GetSection(ChatFeatureOptions.SectionName));
+        services.Configure<McpOptions>(configuration.GetSection(McpOptions.SectionName));
+        services.AddSingleton<McpToolProvider>();
+        services.AddSingleton<IMcpToolProvider>(sp => sp.GetRequiredService<McpToolProvider>());
 
         services.AddChatClient(serviceProvider =>
         {
@@ -23,10 +26,16 @@ public static class ChatClientServiceCollectionExtensions
                 endpoint = $"{endpoint.TrimEnd('/')}/v1";
             }
 
+            var clientOptions = new OpenAIClientOptions
+            {
+                Endpoint = new Uri(endpoint),
+                NetworkTimeout = TimeSpan.FromMinutes(5)
+            };
+
             return new ChatClient(
                 options.Model,
                 new ApiKeyCredential(options.ApiKey),
-                new OpenAIClientOptions { Endpoint = new Uri(endpoint) })
+                clientOptions)
                 .AsIChatClient();
         })
         .UseFunctionInvocation()
