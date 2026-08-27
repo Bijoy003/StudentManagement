@@ -1,0 +1,33 @@
+Getting Started with Student Management
+
+This guide will help you get up and running with the Student Management application.
+
+System Requirements
+
+The application requires a modern web browser and an internet connection. For administrators, a stable network connection is recommended for managing users and viewing reports.
+
+Installation and Setup
+
+The application is deployed as a web service. Users access it through their browser at the provided URL. No local installation is required.
+
+Administrators should ensure that the database is properly configured and that email services are set up for password reset and notification features.
+
+First-Time Login
+
+Navigate to the application URL in your browser. Click the Login button and enter the credentials provided by your system administrator. If Google OAuth is enabled, you can also sign in with your Google account.
+
+After logging in, you will see the main navigation menu with links to Students, Courses, Enrollments, and Chat.
+
+Using the Chat Assistant
+
+The chat assistant is an AI-powered tool that can answer questions about the application and retrieve live data from the system. You can ask questions like "How many students are enrolled?" or "Show me courses with more than 5 students."
+
+The assistant uses function tools to query the database directly, so answers are always based on current data.
+
+Troubleshooting
+
+If you encounter issues, check that your account has the appropriate permissions. Contact your system administrator for role assignments and access issues.</think>
+
+<｜DSML｜tool_calls>
+<｜DSML｜invoke name="todowrite">
+<｜DSML｜parameter name="todos" string="false">[{"priority": "high", "content": "Create .txt test file in AppKnowledge", "status": "completed"}, {"priority": "high", "content": "Create .docx test file using NPOI", "status": "in_progress"}, {"priority": "high", "content": "Create .pdf test file", "status": "pending"}, {"priority": "high", "content": "Build and run tests to verify", "status": "pending"}]

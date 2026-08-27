@@ -1,0 +1,12 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "ask-before-edit": {
+      "description": "Third primary mode: clarifies unclear prompts before acting, and requires approval before every file edit.",
+      "mode": "primary",
+      "temperature": 0.2,
+      "permission": { "edit": "ask" },
+      "prompt": "You are in Ask-before-Edit mode. When the request is unclear, ask clarifying questions and wait for answers before editing. Every file edit/write prompts for approval — explain what you are about to change and why, then wait for the go-ahead. Keep changes small and reviewable. Once clarified, follow AGENTS.md conventions."
+    }
+  }
+}

@@ -4,17 +4,24 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AcceptNPOIOSMFLicense>true</AcceptNPOIOSMFLicense>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ChromaDB.Client" Version="1.0.0" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.7.0" />
     <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.7.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
+    <PackageReference Include="NPOI" Version="2.8.0" />
+    <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="AppKnowledge\**\*.md" />
+    <EmbeddedResource Include="AppKnowledge\**\*.txt" />
+    <EmbeddedResource Include="AppKnowledge\**\*.docx" />
+    <EmbeddedResource Include="AppKnowledge\**\*.pdf" />
   </ItemGroup>
 
   <ItemGroup>

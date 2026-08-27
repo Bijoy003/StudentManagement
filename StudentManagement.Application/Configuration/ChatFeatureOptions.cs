@@ -11,5 +11,7 @@ namespace StudentManagement.Application.Configuration
         public int MaxRagChunks { get; set; } = 3;
 
         public bool IncludeTools { get; set; } = true;
+
+        public string EmbeddingModel { get; set; } = "nomic-embed-text";
     }
 }
