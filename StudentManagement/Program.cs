@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using StudentManagement.Application.Interfaces;
 using StudentManagement.Application.Evaluation;
+using StudentManagement.Commands;
 using StudentManagement.Configuration;
 using StudentManagement.Application.Services;
 using StudentManagement.Domain.Interfaces;
@@ -77,7 +78,15 @@ builder.Services.AddEvaluationServices(builder.Configuration);
 builder.Services.AddSingleton<IAppKnowledgeService, AppKnowledgeService>();
 builder.Services.AddScoped<ChatTools>();
 builder.Services.AddScoped<IChatService, ChatService>();
+
 var app = builder.Build();
+
+// Handle CLI commands
+if (args.Length > 0 && args[0] == "evaluate")
+{
+    var exitCode = await EvaluationCommand.RunAsync(args[1..], app.Services);
+    return exitCode;
+}
 
 if (!app.Environment.IsDevelopment())
 {
@@ -171,4 +180,5 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-app.Run();
+await app.RunAsync();
+return 0;
