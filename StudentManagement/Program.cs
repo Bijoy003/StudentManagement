@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using StudentManagement.Application.Interfaces;
+using StudentManagement.Application.Evaluation;
 using StudentManagement.Configuration;
 using StudentManagement.Application.Services;
 using StudentManagement.Domain.Interfaces;
@@ -70,6 +71,8 @@ builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IPrimeNumberService, PrimeNumberService>();
 
 builder.Services.AddAppChatClient(builder.Configuration);
+
+builder.Services.AddEvaluationServices(builder.Configuration);
 
 builder.Services.AddSingleton<IAppKnowledgeService, AppKnowledgeService>();
 builder.Services.AddScoped<ChatTools>();
