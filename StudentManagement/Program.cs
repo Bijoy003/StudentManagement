@@ -11,8 +11,12 @@ using StudentManagement.Application.Services;
 using StudentManagement.Domain.Interfaces;
 using StudentManagement.Infrastructure.Data;
 using StudentManagement.Infrastructure.Repositories;
+using StudentManagement.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.AddSerilogLogging();
+builder.AddOpenTelemetry();
 
 // Add in-memory caching
 builder.Services.AddMemoryCache();
@@ -214,6 +218,8 @@ using (var scope = app.Services.CreateScope())
 app.UseIpRateLimiting();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+app.UseSerilogLogging();
 
 //app.UseStaticFiles(new StaticFileOptions
 //{
