@@ -123,6 +123,17 @@ StudentMangement/                                # ORPHANED empty folder (note t
 - `ChatController`: Index (GET /Chat), Send (POST /Chat/Send, JSON `ChatRequest`, supports file/image attachments parsed via `IDocumentParser`)
 - `AccountController`: Login, MFA (authenticator TOTP + QRCoder), Profile, Password, Google ExternalLogin
 - `AdminController`: `[Authorize(Roles = "Admin")]` CreateUser
+- `StudentApiController`: `[ApiController] [Route("api/students")]` — REST CRUD API (see below)
+
+## REST API (`/api/*`)
+
+- Attribute-routed `[ApiController]` controllers are mapped by `app.MapControllers()` in `Program.cs` (conventional MVC route is registered separately and unchanged).
+- **Students:** `GET /api/students` (`page`, `pageSize` max 100, `search` on name/email, `minCourses`), `GET /api/students/{id}`, `POST /api/students`, `PUT /api/students/{id}` (full replace), `PATCH /api/students/{id}` (`application/merge-patch+json`, omitted fields unchanged), `DELETE /api/students/{id}`.
+- Status codes: 200 with `PagedResult<StudentDto>` + `X-Total-Count` header on list, 201 + `Location` on create, 204 on update/delete, 400 `ValidationProblemDetails` (auto from `[ApiController]`), 401 unauthenticated, 403 wrong role, 404/415/500 as `ProblemDetails`.
+- **Auth:** class-level `[Authorize]` (any signed-in user can read); writes require `Admin` or `Teacher`. `/api/*` returns 401/403 instead of the cookie handler's HTML redirects, and `/api/*` is excluded from the `/Home/Error` status-code re-execute.
+- **Contracts** live in `StudentManagement.Application/DTOs/` (`Students/StudentDto`, `StudentRequest`, `StudentPatchRequest`, `StudentQuery`, `StudentMappingExtensions`, `Common/PagedResult<T>`) — the domain `Student` entity is never bound or serialized directly.
+- `EvaluationController` is the other `[ApiController]` (`[Authorize(Roles = "Admin")]`, `/api/evaluation`).
+- **Swagger UI (Development only):** `https://localhost:7201/swagger` (docs JSON at `/swagger/v1/swagger.json`). `Swashbuckle.AspNetCore` 6.7.1; `DocInclusionPredicate` restricts the document to `/api/*` (MVC view actions are excluded — otherwise `HomeController.Error`'s attribute route breaks generation with "Ambiguous HTTP method"). Auth is cookie-based, so log in at `/Account/Login` in the same browser and "Try it out" is authenticated automatically (the `cookieAuth` scheme is documentation only — no API key/cookie value needs entering). Anonymous requests from a private window return 401.
 
 ## AI Chat & RAG Architecture
 

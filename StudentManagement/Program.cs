@@ -2,6 +2,7 @@ using AspNetCoreRateLimit;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.OpenApi.Models;
 using StudentManagement.Application.Interfaces;
 using StudentManagement.Application.Evaluation;
 using StudentManagement.Commands;
@@ -29,6 +30,47 @@ builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>()
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+
+// Swagger / OpenAPI (served only in Development, see UseSwagger below)
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "StudentManagement API",
+        Version = "v1",
+        Description = "REST endpoints for students, courses, enrollments and RAG evaluation. " +
+                      "Authentication: sign in at /Account/Login in this browser first, then use \"Try it out\" - " +
+                      "the Identity cookie is sent automatically. Writes require the Admin or Teacher role."
+    });
+
+    // Only surface /api/* endpoints; MVC view actions are not part of the API contract.
+    options.DocInclusionPredicate((_, apiDescription) =>
+        apiDescription.RelativePath?.StartsWith("api/", StringComparison.OrdinalIgnoreCase) == true);
+
+    options.AddSecurityDefinition("cookieAuth", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.ApiKey,
+        In = ParameterLocation.Cookie,
+        Name = ".AspNetCore.Identity.Application",
+        Description = "No action needed: sign in at /Account/Login in this browser and the cookie is sent with every request."
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "cookieAuth"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(
     builder.Configuration.GetConnectionString("DatabaseConnection")
     ));
@@ -60,6 +102,31 @@ builder.Services.ConfigureApplicationCookie(options =>
 {
     options.LoginPath = "/Account/Login";
     options.AccessDeniedPath = "/Account/AccessDenied";
+
+    // API clients must receive status codes, not HTML login redirects.
+    options.Events.OnRedirectToLogin = context =>
+    {
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        }
+
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
+
+    options.Events.OnRedirectToAccessDenied = context =>
+    {
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        }
+
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
 });
 
 // Services
@@ -93,8 +160,10 @@ if (!app.Environment.IsDevelopment())
     // Global exception handler
     app.UseExceptionHandler("/Home/Error");
 
-    // Handles status code pages (e.g., 404)
-    app.UseStatusCodePagesWithReExecute("/Home/Error", "?statusCode={0}");
+    // Handles status code pages (e.g., 404) for MVC pages only; API responses keep their status code and body.
+    app.UseWhen(
+        context => !context.Request.Path.StartsWithSegments("/api"),
+        branch => branch.UseStatusCodePagesWithReExecute("/Home/Error", "?statusCode={0}"));
     app.UseHsts();
 }
 else
@@ -173,12 +242,25 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.UseRouting();
 
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "StudentManagement API v1");
+        options.DocumentTitle = "StudentManagement API";
+        options.DisplayRequestDuration();
+    });
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
+
+app.MapControllers();
 
 await app.RunAsync();
 return 0;
