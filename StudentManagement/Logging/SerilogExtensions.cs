@@ -1,20 +1,13 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Prometheus;
 using Serilog;
-using Serilog.Context;
 using Serilog.Core;
-using Serilog.Enrichers;
 using Serilog.Events;
 using Serilog.Formatting.Json;
 using System.Diagnostics;
-using System.Diagnostics.Metrics;
 
 namespace StudentManagement.Logging
 {
@@ -24,24 +17,26 @@ namespace StudentManagement.Logging
         {
             var configuration = builder.Configuration;
 
+            // Sinks are declared here so the log directory resolves against the content root: under IIS
+            // the current working directory (%WINDIR%\System32\inetsrv) is not writable, which makes a
+            // relative "logs/" path fail silently. Levels and enrichers stay in the "Serilog" section of
+            // appsettings.json - declaring the same sink in both places writes every event twice.
+            var logDirectory = Path.Combine(builder.Environment.ContentRootPath, "logs");
+            Directory.CreateDirectory(logDirectory);
+
             Log.Logger = new LoggerConfiguration()
                 .ReadFrom.Configuration(configuration)
-                .Enrich.FromLogContext()
-                .Enrich.WithMachineName()
-                .Enrich.WithEnvironmentName()
-                .Enrich.WithThreadId()
-                .Enrich.WithProperty("Application", "StudentManagement")
                 .Enrich.With<CorrelationIdEnricher>()
                 .Enrich.With<SensitiveDataEnricher>()
                 .WriteTo.Console(new JsonFormatter())
                 .WriteTo.File(
-                    path: "logs/studentmanagement-.log",
+                    path: Path.Combine(logDirectory, "studentmanagement-.log"),
                     rollingInterval: RollingInterval.Day,
                     retainedFileCountLimit: 30,
                     formatter: new JsonFormatter(),
                     restrictedToMinimumLevel: LogEventLevel.Information)
                 .WriteTo.File(
-                    path: "logs/studentmanagement-errors-.log",
+                    path: Path.Combine(logDirectory, "studentmanagement-errors-.log"),
                     rollingInterval: RollingInterval.Day,
                     retainedFileCountLimit: 90,
                     formatter: new JsonFormatter(),
@@ -49,8 +44,6 @@ namespace StudentManagement.Logging
                 .CreateLogger();
 
             builder.Host.UseSerilog();
-            builder.Services.AddSingleton<IMetricCollector, PrometheusMetricCollector>();
-            builder.Services.AddSingleton<ITracingService, OpenTelemetryTracingService>();
 
             return builder;
         }
@@ -60,104 +53,75 @@ namespace StudentManagement.Logging
             app.UseSerilogRequestLogging(options =>
             {
                 options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000}ms";
+                options.GetLevel = (_, _, exception) =>
+                    exception is null ? LogEventLevel.Information : LogEventLevel.Error;
                 options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
                 {
-                    diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value);
+                    diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value ?? string.Empty);
                     diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
-                    diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.FirstOrDefault());
-                    diagnosticContext.Set("RemoteIp", httpContext.Connection.RemoteIpAddress?.ToString());
-                    diagnosticContext.Set("CorrelationId", httpContext.Response.Headers["X-Correlation-ID"].FirstOrDefault());
+                    diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
+                    diagnosticContext.Set("RemoteIp", httpContext.Connection.RemoteIpAddress?.ToString() ?? string.Empty);
+                    diagnosticContext.Set("UserName", httpContext.User?.Identity?.Name ?? "anonymous");
+                    diagnosticContext.Set(
+                        "CorrelationId",
+                        httpContext.Response.Headers[CorrelationIdMiddleware.CorrelationIdHeader].FirstOrDefault()
+                            ?? string.Empty);
                 };
             });
 
             app.UseMiddleware<CorrelationIdMiddleware>();
             app.UseHttpMetrics();
-            app.MapMetrics();
+
+            // /metrics has no authorization, so it is only published in development. In production,
+            // scrape it over an internal port or front it with a network policy instead.
+            if (app.Environment.IsDevelopment())
+            {
+                app.MapMetrics();
+            }
 
             return app;
         }
     }
 
+    /// <summary>
+    /// Adds a correlation id to every event, including events logged outside a request (startup,
+    /// background work). A request-scoped CorrelationId pushed by <see cref="CorrelationIdMiddleware"/>
+    /// wins, because <c>AddPropertyIfAbsent</c> keeps the value that is already present.
+    /// </summary>
     public class CorrelationIdEnricher : ILogEventEnricher
     {
+        private const string CorrelationIdProperty = "CorrelationId";
+
         public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
         {
-            if (LogContext.PushProperty("CorrelationId", Activity.Current?.Id ?? "unknown") is IDisposable disposable)
-            {
-                disposable.Dispose();
-            }
+            var traceId = Activity.Current?.TraceId.ToString();
+
+            logEvent.AddPropertyIfAbsent(
+                propertyFactory.CreateProperty(CorrelationIdProperty, traceId));
         }
     }
 
+    /// <summary>
+    /// Redacts credentials and personal data from the string properties of every event.
+    /// </summary>
     public class SensitiveDataEnricher : ILogEventEnricher
     {
         public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
         {
-            foreach (var property in logEvent.Properties)
+            // Snapshot first: AddOrUpdateProperty mutates the collection we would otherwise enumerate.
+            foreach (var (name, value) in logEvent.Properties.ToArray())
             {
-                if (property.Value is ScalarValue scalar && scalar.Value is string str)
+                if (value is not ScalarValue { Value: string text })
                 {
-                    var sanitized = LogSanitizer.Sanitize(str);
-                    if (sanitized != str)
-                    {
-                        logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty(property.Key, sanitized));
-                    }
+                    continue;
+                }
+
+                var sanitized = LogSanitizer.Sanitize(text);
+                if (!string.Equals(sanitized, text, StringComparison.Ordinal))
+                {
+                    logEvent.AddOrUpdateProperty(propertyFactory.CreateProperty(name, sanitized));
                 }
             }
-        }
-    }
-
-    public interface IMetricCollector
-    {
-        void IncrementCounter(string name, string help, params string[] labels);
-        void RecordHistogram(string name, string help, double value, params string[] labels);
-        void SetGauge(string name, string help, double value, params string[] labels);
-    }
-
-    public class PrometheusMetricCollector : IMetricCollector
-    {
-        private readonly Counter _requestCounter;
-        private readonly Histogram _requestDuration;
-        private readonly Gauge _activeRequests;
-
-        public PrometheusMetricCollector()
-        {
-            _requestCounter = Metrics.CreateCounter("http_requests_total", "Total HTTP requests", "method", "path", "status_code");
-            _requestDuration = Metrics.CreateHistogram("http_request_duration_seconds", "HTTP request duration in seconds", "method", "path");
-            _activeRequests = Metrics.CreateGauge("http_active_requests", "Active HTTP requests", "method", "path");
-        }
-
-        public void IncrementCounter(string name, string help, params string[] labels)
-        {
-            var counter = Metrics.CreateCounter(name, help, labels);
-            counter.Inc();
-        }
-
-        public void RecordHistogram(string name, string help, double value, params string[] labels)
-        {
-            var histogram = Metrics.CreateHistogram(name, help, labels);
-            histogram.Observe(value);
-        }
-
-        public void SetGauge(string name, string help, double value, params string[] labels)
-        {
-            var gauge = Metrics.CreateGauge(name, help, labels);
-            gauge.Set(value);
-        }
-    }
-
-    public interface ITracingService
-    {
-        Activity? StartActivity(string name, ActivityKind kind = ActivityKind.Internal);
-    }
-
-    public class OpenTelemetryTracingService : ITracingService
-    {
-        private static readonly ActivitySource ActivitySource = new("StudentManagement");
-
-        public Activity? StartActivity(string name, ActivityKind kind = ActivityKind.Internal)
-        {
-            return ActivitySource.StartActivity(name, kind);
         }
     }
 
@@ -167,20 +131,31 @@ namespace StudentManagement.Logging
         {
             builder.Services.AddOpenTelemetry()
                 .ConfigureResource(resource => resource.AddService("StudentManagement"))
-                .WithTracing(tracing => tracing
-                    .AddSource("StudentManagement")
-                    .AddAspNetCoreInstrumentation(options =>
+                .WithTracing(tracing =>
+                {
+                    // No custom ActivitySource is emitted today; add .AddSource(...) alongside one if
+                    // application-level spans are introduced.
+                    tracing
+                        .AddAspNetCoreInstrumentation(options =>
+                        {
+                            options.RecordException = true;
+                            options.Filter = httpContext =>
+                                !httpContext.Request.Path.StartsWithSegments("/metrics");
+                        })
+                        .AddHttpClientInstrumentation()
+                        .AddEntityFrameworkCoreInstrumentation(options =>
+                        {
+                            options.SetDbStatementForText = true;
+                            options.SetDbStatementForStoredProcedure = true;
+                        });
+
+                    // Exporting every span to the console duplicates the Serilog console sink and, in
+                    // production, dumps one line per HTTP and EF Core call to stdout.
+                    if (builder.Environment.IsDevelopment())
                     {
-                        options.RecordException = true;
-                        options.Filter = (httpContext) => !httpContext.Request.Path.StartsWithSegments("/metrics");
-                    })
-                    .AddHttpClientInstrumentation()
-                    .AddEntityFrameworkCoreInstrumentation(options =>
-                    {
-                        options.SetDbStatementForText = true;
-                        options.SetDbStatementForStoredProcedure = true;
-                    })
-                    .AddConsoleExporter())
+                        tracing.AddConsoleExporter();
+                    }
+                })
                 .WithMetrics(metrics => metrics
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation());
