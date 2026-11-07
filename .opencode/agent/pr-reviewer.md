@@ -1,6 +1,7 @@
 ---
 description: Principal architect that audits code changes against the project's Clean Architecture, conventions, DI, security, and EF Core rules. Use before committing/pushing to review a diff.
 mode: subagent
+model: dashscope/glm-5.3
 temperature: 0.1
 permission:
   edit: deny

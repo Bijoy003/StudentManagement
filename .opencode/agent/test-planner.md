@@ -1,6 +1,7 @@
 ---
 description: Writes xUnit + Moq test suites (TDD, RED phase) before production code. Use for planning and authoring tests for new features or fixes in StudentManagement.Tests.
 mode: subagent
+model: dashscope/qwen3-coder-flash
 temperature: 0.2
 permission:
   edit: allow

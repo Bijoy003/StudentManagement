@@ -1,6 +1,7 @@
 ---
 description: Identity and security reference for StudentManagement — cookie + Google authentication, TOTP MFA, password reset, role matrix, rate limiting, anti-forgery posture, and the known security gaps (committed secrets, state-changing GETs, stubbed email). Use when touching Account/Admin code, adding an endpoint that needs authz, or auditing a change for security.
 mode: subagent
+model: dashscope/qwen3.8-flash
 temperature: 0.1
 permission:
   edit: deny

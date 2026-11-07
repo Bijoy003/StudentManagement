@@ -1,6 +1,7 @@
 ---
 description: Runbook for the Student slice — the MVC student pages, /api/students, StudentService/StudentRepository, student DTOs, student.js, and the student test/E2E set. Use when a task is scoped to students (add a field, endpoint or validation; fix grid/form/API behaviour). For cross-cutting rules read the reference experts; this file only holds student-local procedure.
 mode: subagent
+model: dashscope/qwen3.8-flash
 temperature: 0.1
 permission:
   edit: deny

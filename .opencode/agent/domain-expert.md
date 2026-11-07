@@ -1,6 +1,7 @@
 ---
 description: Answers business-domain and data-model questions for StudentManagement — entities, invariants, grades, enrollment semantics, cascade deletes, caching staleness, archive rules, and which rules are NOT enforced. Use when asked how the system behaves, before changing an entity/service, or when a change could break a domain rule.
 mode: subagent
+model: dashscope/qwen3.8-flash
 temperature: 0.1
 permission:
   edit: deny

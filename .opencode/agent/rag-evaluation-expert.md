@@ -1,6 +1,7 @@
 ---
 description: Specialist for the RAG evaluation subsystem (dataset, prompt versions, deterministic + LLM-judge metrics, thresholds, `evaluate` CLI, /api/evaluation endpoints, and the CI regression gate). Use when adding evaluation questions or prompts, interpreting a run, tuning thresholds, or debugging the evaluation workflow.
 mode: subagent
+model: dashscope/qwen3.8-flash
 temperature: 0.2
 permission:
   edit: allow
