@@ -59,6 +59,8 @@ The `*-expert` agents explain, map, and audit; they do not edit (except `chat-ra
 
 `test-planner` (RED) → `implementer` (GREEN) → `self-healer` only if build/test fails → `pr-reviewer` before commit.
 
+Prefer `/ship <task>`: the `orchestrator` primary agent (`.opencode/agents/orchestrator.md`) drives this chain as a stage machine (intake/ACs → RED → GREEN → heal ≤2 → E2E when UI → review ≤2 cycles) and ends every commit with a `Workflow: RED(n)→GREEN→review PASS` trailer. A commit without that trailer counts as pipeline-skipped — never fake one for stages that didn't run.
+
 ## Landmines
 
 - **`AdditionalConfig:Path` is required** (`optional: false`) — `Program.cs` loads `C:\inetpub\appsettings.json` and throws on startup when missing; override with `AdditionalConfig__Path` (E2E uses `scripts/appsettings.e2e.json`). `docker-compose.yml` does **not** set it, so the web container only starts if that file is baked into the image.
