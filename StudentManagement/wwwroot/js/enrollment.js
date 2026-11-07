@@ -1,10 +1,11 @@
 ﻿function saveEnrollment(event) {
     event.preventDefault();
 
-    var id = $('#Id').length ? $('#Id').val() : 0;
-    var studentId = $('#studentId').length ? $('#studentId').val() : null;
-    var courseId = $('#courseId').length ? $('#courseId').val() : null;
-    var grade = $('#grade').length ? $('#grade').val() : null;
+    // The API binds these as numbers; empty inputs must be sent as null ("" fails decimal? binding).
+    var id = $('#Id').length ? Number($('#Id').val()) || 0 : 0;
+    var studentId = $('#studentId').length && $('#studentId').val() !== '' ? Number($('#studentId').val()) : null;
+    var courseId = $('#courseId').length && $('#courseId').val() !== '' ? Number($('#courseId').val()) : null;
+    var grade = $('#grade').length && $('#grade').val() !== '' ? Number($('#grade').val()) : null;
 
     if (!studentId || !courseId) {
         alert('Please select both student and course.');

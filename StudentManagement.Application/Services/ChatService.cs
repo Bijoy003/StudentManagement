@@ -35,7 +35,7 @@ namespace StudentManagement.Application.Services
             var userQuery = history.LastOrDefault(m => m.Role == ChatRole.User)?.Text ?? string.Empty;
 
             var ragContext = _features.IncludeRag
-                ? _appKnowledge.SearchRelevantChunks(userQuery, _features.MaxRagChunks)
+                ? await _appKnowledge.SearchRelevantChunks(userQuery, _features.MaxRagChunks)
                 : string.Empty;
 
             var systemPrompt = BuildSystemPrompt(ragContext);

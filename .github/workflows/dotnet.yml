@@ -11,7 +11,6 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
@@ -26,3 +25,62 @@ jobs:
       run: dotnet build --no-restore
     - name: Test
       run: dotnet test --no-build --verbosity normal
+
+  evaluation:
+    name: RAG Evaluation
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'pull_request'
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+    - name: Setup Ollama
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+    - name: Install Ollama
+      run: |
+        curl -fsSL https://ollama.com/install.sh | sh
+        ollama serve &
+        sleep 5
+        ollama pull qwen2.5:3b-instruct
+        ollama pull nomic-embed-text
+    - name: Start ChromaDB
+      run: |
+        docker run -d -p 8000:8000 --name chromadb chromadb/chroma:latest
+        sleep 10
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --no-restore
+    - name: Run Evaluation (v1 baseline)
+      run: |
+        dotnet run --project StudentManagement -- evaluate -p v1 -o evaluation-v1.json || true
+    - name: Run Evaluation (v2 variant)
+      run: |
+        dotnet run --project StudentManagement -- evaluate -p v2 -o evaluation-v2.json || true
+    - name: Compare Prompts
+      run: |
+        dotnet run --project StudentManagement -- evaluate --compare --baseline v1 --variant v2 -o comparison.json || true
+    - name: Upload Evaluation Reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: evaluation-reports
+        path: |
+          evaluation-v1.json
+          evaluation-v2.json
+          comparison.json
+    - name: Check for Regressions
+      run: |
+        if [ -f comparison.json ]; then
+          REGRESSION=$(cat comparison.json | jq -r '.comparison | select(.isSignificant and (.relevanceDelta < -0.05 or .groundednessDelta < -0.05 or .correctnessDelta < -0.05 or .hallucinationDelta > 0.05))')
+          if [ -n "$REGRESSION" ]; then
+            echo "::error::Regression detected in prompt comparison!"
+            cat comparison.json | jq '.comparison'
+            exit 1
+          fi
+          echo "No significant regressions detected."
+        fi

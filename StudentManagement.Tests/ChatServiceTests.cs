@@ -22,7 +22,7 @@ namespace StudentManagement.Tests
 
             var mockKnowledge = new Mock<IAppKnowledgeService>();
             mockKnowledge.Setup(k => k.GetDocumentation()).Returns("Application documentation.");
-            mockKnowledge.Setup(k => k.SearchRelevantChunks(It.IsAny<string>(), It.IsAny<int>())).Returns(string.Empty);
+            mockKnowledge.Setup(k => k.SearchRelevantChunks(It.IsAny<string>(), It.IsAny<int>())).ReturnsAsync(string.Empty);
 
             var chatTools = new ChatTools(
                 Mock.Of<IStudentService>(),
@@ -67,7 +67,7 @@ namespace StudentManagement.Tests
                 .ReturnsAsync(new ChatResponse(new ChatMessage(ChatRole.Assistant, "Jira reply.")));
 
             var mockKnowledge = new Mock<IAppKnowledgeService>();
-            mockKnowledge.Setup(k => k.SearchRelevantChunks(It.IsAny<string>(), It.IsAny<int>())).Returns(string.Empty);
+            mockKnowledge.Setup(k => k.SearchRelevantChunks(It.IsAny<string>(), It.IsAny<int>())).ReturnsAsync(string.Empty);
 
             var mcpTool = AIFunctionFactory.Create(() => "ok", "jira_search", "Search Jira");
 

@@ -1,18 +1,54 @@
 using AspNetCoreRateLimit;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.OpenApi.Models;
 using StudentManagement.Application.Interfaces;
+using StudentManagement.Application.Evaluation;
+using StudentManagement.Commands;
 using StudentManagement.Configuration;
 using StudentManagement.Application.Services;
 using StudentManagement.Domain.Interfaces;
 using StudentManagement.Infrastructure.Data;
 using StudentManagement.Infrastructure.Repositories;
+using StudentManagement.Infrastructure.Services;
+using StudentManagement.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add in-memory caching
+builder.AddSerilogLogging();
+builder.AddOpenTelemetry();
+
+// Add in-memory caching (fallback)
 builder.Services.AddMemoryCache();
+
+// Distributed cache: Redis when a connection is configured (docker-compose),
+var redisConnection = builder.Configuration.GetConnectionString("Redis");
+if (!string.IsNullOrWhiteSpace(redisConnection))
+{
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnection;
+        options.InstanceName = "StudentManagement:";
+    });
+}
+else
+{
+    builder.Services.AddDistributedMemoryCache();
+}
+
+// Add DbContext for primary (read/write)
+builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(
+    builder.Configuration.GetConnectionString("DatabaseConnection")
+    ));
+
+// Add DbContext for read replica (read-only); falls back to the primary database when no replica is configured.
+var readOnlyConnection = builder.Configuration.GetConnectionString("DatabaseConnection_ReadReplica")
+    ?? builder.Configuration.GetConnectionString("DatabaseConnection");
+builder.Services.AddDbContext<ReadOnlyDbContext>(options => options.UseSqlServer(
+    readOnlyConnection
+    ));
 
 builder.Configuration
     .AddJsonFile(builder.Configuration["AdditionalConfig:Path"], optional: false, reloadOnChange: true);
@@ -27,9 +63,48 @@ builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>()
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
-builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(
-    builder.Configuration.GetConnectionString("DatabaseConnection")
-    ));
+
+// Swagger / OpenAPI (served only in Development, see UseSwagger below)
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "StudentManagement API",
+        Version = "v1",
+        Description = "REST endpoints for students, courses, enrollments and RAG evaluation. " +
+                      "Authentication: sign in at /Account/Login in this browser first, then use \"Try it out\" - " +
+                      "the Identity cookie is sent automatically. Writes require the Admin or Teacher role."
+    });
+
+    // Only surface /api/* endpoints; MVC view actions are not part of the API contract.
+    options.DocInclusionPredicate((_, apiDescription) =>
+        apiDescription.RelativePath?.StartsWith("api/", StringComparison.OrdinalIgnoreCase) == true);
+
+    options.AddSecurityDefinition("cookieAuth", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.ApiKey,
+        In = ParameterLocation.Cookie,
+        Name = ".AspNetCore.Identity.Application",
+        Description = "No action needed: sign in at /Account/Login in this browser and the cookie is sent with every request."
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "cookieAuth"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
+
 // Identity
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
@@ -58,6 +133,31 @@ builder.Services.ConfigureApplicationCookie(options =>
 {
     options.LoginPath = "/Account/Login";
     options.AccessDeniedPath = "/Account/AccessDenied";
+
+    // API clients must receive status codes, not HTML login redirects.
+    options.Events.OnRedirectToLogin = context =>
+    {
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        }
+
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
+
+    options.Events.OnRedirectToAccessDenied = context =>
+    {
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        }
+
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
 });
 
 // Services
@@ -68,21 +168,38 @@ builder.Services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
 builder.Services.AddScoped<ICourseService, CourseService>();
 builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IPrimeNumberService, PrimeNumberService>();
+builder.Services.AddScoped<IArchiveService, ArchiveService>();
 
 builder.Services.AddAppChatClient(builder.Configuration);
+
+builder.Services.AddEvaluationServices(builder.Configuration);
 
 builder.Services.AddSingleton<IAppKnowledgeService, AppKnowledgeService>();
 builder.Services.AddScoped<ChatTools>();
 builder.Services.AddScoped<IChatService, ChatService>();
+
 var app = builder.Build();
+
+app.Logger.LogInformation(
+    "Distributed cache provider: {CacheProvider}",
+    string.IsNullOrWhiteSpace(redisConnection) ? "in-memory (per-process)" : "Redis");
+
+// Handle CLI commands
+if (args.Length > 0 && args[0] == "evaluate")
+{
+    var exitCode = await EvaluationCommand.RunAsync(args[1..], app.Services);
+    return exitCode;
+}
 
 if (!app.Environment.IsDevelopment())
 {
     // Global exception handler
     app.UseExceptionHandler("/Home/Error");
 
-    // Handles status code pages (e.g., 404)
-    app.UseStatusCodePagesWithReExecute("/Home/Error", "?statusCode={0}");
+    // Handles status code pages (e.g., 404) for MVC pages only; API responses keep their status code and body.
+    app.UseWhen(
+        context => !context.Request.Path.StartsWithSegments("/api"),
+        branch => branch.UseStatusCodePagesWithReExecute("/Home/Error", "?statusCode={0}"));
     app.UseHsts();
 }
 else
@@ -132,7 +249,22 @@ using (var scope = app.Services.CreateScope())
 
 app.UseIpRateLimiting();
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+
+// Static assets are served by a single middleware: a later, path-specific UseStaticFiles("/css")
+// would never run because the first one already serves /css/* and short-circuits the pipeline.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        if (ctx.Context.Request.Path.StartsWithSegments("/css"))
+        {
+            ctx.Context.Response.Headers["Cache-Control"] =
+                "public,max-age=86400"; // 1 day
+        }
+    }
+});
+
+app.UseSerilogLogging();
 
 //app.UseStaticFiles(new StaticFileOptions
 //{
@@ -146,20 +278,18 @@ app.UseStaticFiles();
 //    }
 //});
 
-app.UseStaticFiles(new StaticFileOptions
-{
-    FileProvider = new PhysicalFileProvider(
-        Path.Combine(builder.Environment.ContentRootPath, "wwwroot/css")),
-    RequestPath = "/css",
-    OnPrepareResponse = ctx =>
-    {
-        ctx.Context.Response.Headers["Cache-Control"] =
-            "public,max-age=86400"; // 1 day
-    }
-});
-
-
 app.UseRouting();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "StudentManagement API v1");
+        options.DocumentTitle = "StudentManagement API";
+        options.DisplayRequestDuration();
+    });
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -168,4 +298,7 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-app.Run();
+app.MapControllers();
+
+await app.RunAsync();
+return 0;

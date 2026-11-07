@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StudentManagement.Application.Interfaces;
 using StudentManagement.Application.Services;
@@ -14,17 +16,18 @@ namespace StudentManagement.Tests
             // Arrange
             var mockStudentRepo = new Mock<IStudentRepository>();
             var mockEnrollmentRepo = new Mock<IEnrollmentRepository>();
+            var mockCache = new Mock<IDistributedCache>();
 
-            mockStudentRepo.Setup(r => r.GetByIdAsync(1))
+            mockStudentRepo.Setup(r => r.GetByIdAsyncReadOnly(1))
                            .ReturnsAsync(new Student { Id = 1, Name = "John Doe" });
 
-            var service = new StudentService(mockStudentRepo.Object, mockEnrollmentRepo.Object);
+            var service = new StudentService(mockStudentRepo.Object, mockEnrollmentRepo.Object, mockCache.Object, NullLogger<StudentService>.Instance);
 
             // Act
             var student = await service.GetStudentByIdAsync(1);
 
             // Assert
-            Assert.Equal("John Doe", student.Name);
+            Assert.Equal("John Doe", student!.Name);
         }
 
         [Fact]
@@ -34,9 +37,10 @@ namespace StudentManagement.Tests
             var mockService = new Mock<IStudentService>();
             var mockStudentRepo = new Mock<IStudentRepository>();
             var mockEnrollmentRepo = new Mock<IEnrollmentRepository>();
+            var mockCache = new Mock<IDistributedCache>();
             mockService.Setup(r => r.GetStudentByIdAsync(999)).ReturnsAsync((Student?)null);
 
-            var service = new StudentService(mockStudentRepo.Object, mockEnrollmentRepo.Object);
+            var service = new StudentService(mockStudentRepo.Object, mockEnrollmentRepo.Object, mockCache.Object, NullLogger<StudentService>.Instance);
 
             // Act & Assert
             Assert.ThrowsAsync<Exception>(() => service.GetStudentByIdAsync(999));
@@ -47,18 +51,19 @@ namespace StudentManagement.Tests
         {
             var mockStudentRepo = new Mock<IStudentRepository>();
             var mockEnrollmentRepo = new Mock<IEnrollmentRepository>();
+            var mockCache = new Mock<IDistributedCache>();
 
-            mockStudentRepo.Setup(r => r.GetByIdAsync(It.IsAny<int>()))
+            mockStudentRepo.Setup(r => r.GetByIdAsyncReadOnly(It.IsAny<int>()))
                            .ReturnsAsync(new Student { Id = 1, Name = "John" });
 
-            var service = new StudentService(mockStudentRepo.Object, mockEnrollmentRepo.Object);
+            var service = new StudentService(mockStudentRepo.Object, mockEnrollmentRepo.Object, mockCache.Object, NullLogger<StudentService>.Instance);
 
             var tasks = Enumerable.Range(0, 1000)
                                   .Select(_ => service.GetStudentByIdAsync(1));
 
             var results = await Task.WhenAll(tasks);
 
-            Assert.All(results, r => Assert.Equal("John", r.Name));
+            Assert.All(results, r => Assert.Equal("John", r!.Name));
         }
 
         [Fact]
@@ -68,11 +73,12 @@ namespace StudentManagement.Tests
 
             var mockRepo = new Mock<IStudentRepository>();
             var mockEnrollmentRepo = new Mock<IEnrollmentRepository>();
+            var mockCache = new Mock<IDistributedCache>();
 
-            mockRepo.Setup(r => r.GetByIdAsync(1))
+            mockRepo.Setup(r => r.GetByIdAsyncReadOnly(1))
                     .Returns(tcs.Task);
 
-            var service = new StudentService(mockRepo.Object, mockEnrollmentRepo.Object);
+            var service = new StudentService(mockRepo.Object, mockEnrollmentRepo.Object, mockCache.Object, NullLogger<StudentService>.Instance);
 
             var task = service.GetStudentByIdAsync(1);
 

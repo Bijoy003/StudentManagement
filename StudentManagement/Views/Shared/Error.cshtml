@@ -7,11 +7,16 @@
 <h1 class="text-danger">Error.</h1>
 <h2 class="text-danger">An error occurred while processing your request.</h2>
 
-@if (Model.ShowRequestId)
+@if (Model?.ShowRequestId == true)
 {
     <p>
         <strong>Request ID:</strong> <code>@Model.RequestId</code>
     </p>
+}
+
+@if (ViewData["ErrorMessage"] is string errorMessage && !string.IsNullOrWhiteSpace(errorMessage))
+{
+    <p class="text-danger">@errorMessage</p>
 }
 
 <h3>Development Mode</h3>

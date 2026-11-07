@@ -9,5 +9,7 @@ namespace StudentManagement.Web.Models
     {
         public string Role { get; set; } = string.Empty;
         public string Text { get; set; } = string.Empty;
+        public string? FileName { get; set; }
+        public string? FileData { get; set; }
     }
 }

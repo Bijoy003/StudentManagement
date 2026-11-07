@@ -57,6 +57,11 @@ namespace StudentManagement.Web.Controllers
         {
             try
             {
+                // The Student/Course navigation properties are never part of the JSON payload; their
+                // implicit "required" validation would reject every save.
+                ModelState.Remove(nameof(Enrollment.Student));
+                ModelState.Remove(nameof(Enrollment.Course));
+
                 if (!ModelState.IsValid)
                 {
                     var firstError = ModelState.Values

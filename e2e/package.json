@@ -1,0 +1,16 @@
+{
+  "name": "studentmanagement-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Node.js Playwright end-to-end tests for StudentManagement",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:report": "playwright show-report",
+    "codegen": "playwright codegen --target playwright"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.0",
+    "@types/node": "^20.19.43"
+  }
+}

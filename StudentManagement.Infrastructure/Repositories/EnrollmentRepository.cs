@@ -8,10 +8,12 @@ namespace StudentManagement.Infrastructure.Repositories
     public class EnrollmentRepository : IEnrollmentRepository
     {
         private readonly ApplicationDbContext _dbContext;
+        private readonly ReadOnlyDbContext _readOnlyDbContext;
 
-        public EnrollmentRepository(ApplicationDbContext dbContext)
+        public EnrollmentRepository(ApplicationDbContext dbContext, ReadOnlyDbContext readOnlyDbContext)
         {
             _dbContext = dbContext;
+            _readOnlyDbContext = readOnlyDbContext;
         }
 
         public async Task<IEnumerable<Enrollment>> GetAllAsync()
@@ -19,9 +21,25 @@ namespace StudentManagement.Infrastructure.Repositories
             return await _dbContext.Enrollments.ToListAsync();
         }
 
-        public async Task<Enrollment> GetByIdAsync(int id)
+        public async Task<IEnumerable<Enrollment>> GetAllAsyncReadOnly()
+        {
+            // The index view renders Student/Course names, so the navigations must be loaded explicitly
+            // (AsNoTracking disables the identity-resolution fixup that used to populate them).
+            return await _readOnlyDbContext.Enrollments
+                .Include(e => e.Student)
+                .Include(e => e.Course)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        public async Task<Enrollment?> GetByIdAsync(int id)
         {
             return await _dbContext.Enrollments.FirstOrDefaultAsync(e => e.Id == id);
+        }
+
+        public async Task<Enrollment?> GetByIdAsyncReadOnly(int id)
+        {
+            return await _readOnlyDbContext.Enrollments.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
         }
 
         public async Task AddAsync(Enrollment enrollment)
@@ -55,12 +73,29 @@ namespace StudentManagement.Infrastructure.Repositories
                              .ToListAsync();
         }
 
+        public async Task<IEnumerable<Enrollment>> GetByCourseIdAsyncReadOnly(int courseId)
+        {
+            return await _readOnlyDbContext.Enrollments
+                             .Where(e => e.CourseId == courseId)
+                             .AsNoTracking()
+                             .ToListAsync();
+        }
+
         // Students enrolled in a specific course
         public async Task<List<Student>> GetStudentsByCourseAsync(int courseId)
         {
             return await _dbContext.Enrollments
                 .Where(e => e.CourseId == courseId)
                 .Select(e => e.Student)
+                .ToListAsync();
+        }
+
+        public async Task<List<Student>> GetStudentsByCourseAsyncReadOnly(int courseId)
+        {
+            return await _readOnlyDbContext.Enrollments
+                .Where(e => e.CourseId == courseId)
+                .Select(e => e.Student)
+                .AsNoTracking()
                 .ToListAsync();
         }
 
@@ -72,31 +107,33 @@ namespace StudentManagement.Infrastructure.Repositories
                 .ToListAsync();
         }
 
-        // Students enrolled in more than N courses
-        //public List<Student> GetStudentsEnrolledInMoreThan(int courseCount)
-        //{
-        //    return _dbContext.Student
-        //            .Select(s => new Student
-        //            {
-        //                Id = s.Id,
-        //                Name = s.Name,
-        //                Email = s.Email,
-        //                Enrollments = _dbContext.Enrollments        // nested query
-        //                    .Where(e => e.StudentId == s.Id)
-        //                    .ToList()
-        //            })
-        //            .Where(s => s.Enrollments.Count > courseCount)
-        //            .ToList();
-        //}
-
-        public async Task<List<Student>> GetStudentsEnrolledInMoreThanAsync(int courseCount)
+        public async Task<List<Course>> GetCoursesByStudentAsyncReadOnly(int studentId)
         {
-            return await _dbContext.Students
-                .Where(s => s.Enrollments.Count() > courseCount) // navigation property used here
-                .Include(s => s.Enrollments)                     // optional: eager load enrollments
-                .ThenInclude(e => e.Course)                      // optional: include the courses too
+            return await _readOnlyDbContext.Enrollments
+                .Where(e => e.StudentId == studentId)
+                .Select(e => e.Course)
+                .AsNoTracking()
                 .ToListAsync();
         }
 
+        // Students enrolled in more than N courses
+        public async Task<List<Student>> GetStudentsEnrolledInMoreThanAsync(int courseCount)
+        {
+            return await _dbContext.Students
+                .Where(s => s.Enrollments.Count() > courseCount)
+                .Include(s => s.Enrollments)
+                .ThenInclude(e => e.Course)
+                .ToListAsync();
+        }
+
+        public async Task<List<Student>> GetStudentsEnrolledInMoreThanAsyncReadOnly(int courseCount)
+        {
+            return await _readOnlyDbContext.Students
+                .Where(s => s.Enrollments.Count() > courseCount)
+                .Include(s => s.Enrollments)
+                .ThenInclude(e => e.Course)
+                .AsNoTracking()
+                .ToListAsync();
+        }
     }
 }
