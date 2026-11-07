@@ -15,6 +15,10 @@ namespace StudentManagement.Web.Controllers
             _logger = logger;
         }
 
+        // Client-side caching is requested here, but these pages render the layout's antiforgery
+        // token (logout form) and DefaultAntiforgery forces 'no-cache, no-store' on the response.
+        // See docs/caching.md - type 3.
+        [ResponseCache(Duration = 60, Location = ResponseCacheLocation.Client)]
         public async Task<IActionResult> Index()
         {
             try
@@ -33,7 +37,7 @@ namespace StudentManagement.Web.Controllers
         {
             try
             {
-                Course course;
+                Course? course;
 
                 if (id == null)
                 {
@@ -42,6 +46,10 @@ namespace StudentManagement.Web.Controllers
                 else
                 {
                     course = await _courseService.GetCourseById(id.Value);
+                    if (course is null)
+                    {
+                        return NotFound();
+                    }
                 }
 
                 return View(course);
@@ -91,6 +99,7 @@ namespace StudentManagement.Web.Controllers
             }
         }
 
+        [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Client)]
         public async Task<IActionResult> StudentCountPerCourse()
         {
             try

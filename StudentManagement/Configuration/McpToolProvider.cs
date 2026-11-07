@@ -10,14 +10,24 @@ public sealed class McpToolProvider : IMcpToolProvider, IAsyncDisposable
 {
     private readonly McpOptions _options;
     private readonly ILogger<McpToolProvider> _logger;
+    private readonly Func<CancellationToken, Task<List<AITool>>> _loadToolsAsync;
     private readonly SemaphoreSlim _initLock = new(1, 1);
     private readonly List<McpClient> _clients = [];
     private IReadOnlyList<AITool>? _cachedTools;
 
     public McpToolProvider(IOptions<McpOptions> options, ILogger<McpToolProvider> logger)
+        : this(options, logger, loadToolsAsync: null)
+    {
+    }
+
+    internal McpToolProvider(
+        IOptions<McpOptions> options,
+        ILogger<McpToolProvider> logger,
+        Func<CancellationToken, Task<List<AITool>>>? loadToolsAsync)
     {
         _options = options.Value;
         _logger = logger;
+        _loadToolsAsync = loadToolsAsync ?? LoadToolsAsync;
     }
 
     public async Task<IReadOnlyList<AITool>> GetToolsAsync(CancellationToken cancellationToken = default)
@@ -29,6 +39,10 @@ public sealed class McpToolProvider : IMcpToolProvider, IAsyncDisposable
 
         if (_cachedTools is not null)
         {
+            _logger.LogDebug(
+                "Cache HIT {CacheKey} ({ToolCount} memoized MCP tools)",
+                "mcp_tools",
+                _cachedTools.Count);
             return _cachedTools;
         }
 
@@ -40,38 +54,7 @@ public sealed class McpToolProvider : IMcpToolProvider, IAsyncDisposable
                 return _cachedTools;
             }
 
-            var tools = new List<AITool>();
-
-            foreach (var (serverKey, server) in _options.Servers)
-            {
-                if (!server.Enabled)
-                {
-                    continue;
-                }
-
-                try
-                {
-                    var transport = CreateTransport(serverKey, server);
-                    var client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken);
-                    _clients.Add(client);
-
-                    var serverTools = await client.ListToolsAsync(cancellationToken: cancellationToken);
-                    foreach (var tool in serverTools)
-                    {
-                        tools.Add(tool.WithName($"{serverKey}_{tool.Name}"));
-                    }
-
-                    _logger.LogInformation(
-                        "Connected to MCP server '{ServerKey}' and loaded {ToolCount} tools.",
-                        serverKey,
-                        serverTools.Count);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to connect to MCP server '{ServerKey}'. Skipping.", serverKey);
-                }
-            }
-
+            var tools = await _loadToolsAsync(cancellationToken);
             _cachedTools = tools;
             return _cachedTools;
         }
@@ -79,6 +62,43 @@ public sealed class McpToolProvider : IMcpToolProvider, IAsyncDisposable
         {
             _initLock.Release();
         }
+    }
+
+    private async Task<List<AITool>> LoadToolsAsync(CancellationToken cancellationToken)
+    {
+        var tools = new List<AITool>();
+
+        foreach (var (serverKey, server) in _options.Servers)
+        {
+            if (!server.Enabled)
+            {
+                continue;
+            }
+
+            try
+            {
+                var transport = CreateTransport(serverKey, server);
+                var client = await McpClient.CreateAsync(transport, cancellationToken: cancellationToken);
+                _clients.Add(client);
+
+                var serverTools = await client.ListToolsAsync(cancellationToken: cancellationToken);
+                foreach (var tool in serverTools)
+                {
+                    tools.Add(tool.WithName($"{serverKey}_{tool.Name}"));
+                }
+
+                _logger.LogInformation(
+                    "Connected to MCP server '{ServerKey}' and loaded {ToolCount} tools.",
+                    serverKey,
+                    serverTools.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to connect to MCP server '{ServerKey}'. Skipping.", serverKey);
+            }
+        }
+
+        return tools;
     }
 
     private static IClientTransport CreateTransport(string serverKey, McpServerEntry server)

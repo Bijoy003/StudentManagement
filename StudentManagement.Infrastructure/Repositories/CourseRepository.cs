@@ -9,10 +9,12 @@ namespace StudentManagement.Infrastructure.Repositories
     public class CourseRepository : ICourseRepository
     {
         private readonly ApplicationDbContext _dbContext;
+        private readonly ReadOnlyDbContext _readOnlyDbContext;
 
-        public CourseRepository(ApplicationDbContext dbContext)
+        public CourseRepository(ApplicationDbContext dbContext, ReadOnlyDbContext readOnlyDbContext)
         {
             _dbContext = dbContext;
+            _readOnlyDbContext = readOnlyDbContext;
         }
 
         public async Task<IEnumerable<Course>> GetAllAsync()
@@ -20,9 +22,19 @@ namespace StudentManagement.Infrastructure.Repositories
             return await _dbContext.Courses.ToListAsync();
         }
 
-        public async Task<Course> GetByIdAsync(int id)
+        public async Task<IEnumerable<Course>> GetAllAsyncReadOnly()
+        {
+            return await _readOnlyDbContext.Courses.AsNoTracking().ToListAsync();
+        }
+
+        public async Task<Course?> GetByIdAsync(int id)
         {
             return await _dbContext.Courses.FirstOrDefaultAsync(c => c.Id == id);
+        }
+
+        public async Task<Course?> GetByIdAsyncReadOnly(int id)
+        {
+            return await _readOnlyDbContext.Courses.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
         }
 
         public async Task AddAsync(Course course)
@@ -66,22 +78,22 @@ namespace StudentManagement.Infrastructure.Repositories
                                 .ToListAsync();
         }
 
-
-
-
-        //public List<CourseStudentCountDto> GetStudentCountPerCourse()
-        //{
-        //    return _dbContext.Enrollments
-        //        .GroupBy(e => new { e.CourseId, e.Course.Name })
-        //        .Select(g => new CourseStudentCountDto
-        //        {
-        //            CourseName = g.Key.Name,
-        //            StudentCount = g.Count(),
-        //            course = g.FirstOrDefault(),
-        //        })
-        //        .ToList();
-        //}
-
+        public async Task<List<CourseStudentCountDto>> GetStudentCountPerCourseAsyncReadOnly()
+        {
+            return await _readOnlyDbContext.Courses
+                                .Join(_readOnlyDbContext.Enrollments,
+                                      c => c.Id,
+                                      e => e.CourseId,
+                                      (c, e) => new { c.Name, e.StudentId })
+                                .GroupBy(x => x.Name)
+                                .Select(g => new CourseStudentCountDto
+                                {
+                                    CourseName = g.Key,
+                                    StudentCount = g.Count(),
+                                    course = g.FirstOrDefault(),
+                                })
+                                .AsNoTracking()
+                                .ToListAsync();
+        }
     }
-
 }

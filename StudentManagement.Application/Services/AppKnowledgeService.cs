@@ -1,5 +1,7 @@
 using ChromaDB.Client;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StudentManagement.Application.Configuration;
 using StudentManagement.Application.Interfaces;
@@ -8,6 +10,8 @@ namespace StudentManagement.Application.Services
 {
     public class AppKnowledgeService : IAppKnowledgeService
     {
+        private const string DocumentationCacheKey = "app_knowledge_documentation";
+
         private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
         private readonly int _maxRagChunks;
         private readonly ChromaClient _chromaClient;
@@ -16,6 +20,8 @@ namespace StudentManagement.Application.Services
         private readonly HttpClient _httpClient;
         private readonly IEnumerable<IDocumentParser> _parsers;
         private readonly SemanticChunker _semanticChunker;
+        private readonly IMemoryCache _memoryCache;
+        private readonly ILogger<AppKnowledgeService> _logger;
         private readonly Lazy<Task> _initialization;
 
         private IReadOnlyList<KnowledgeChunk> _chunks = [];
@@ -30,7 +36,9 @@ namespace StudentManagement.Application.Services
             IOptions<ChromaOptions> chromaOptions,
             HttpClient httpClient,
             IEnumerable<IDocumentParser> parsers,
-            SemanticChunker semanticChunker)
+            SemanticChunker semanticChunker,
+            IMemoryCache memoryCache,
+            ILogger<AppKnowledgeService> logger)
         {
             _embeddingGenerator = embeddingGenerator;
             _maxRagChunks = features.Value.MaxRagChunks;
@@ -40,6 +48,8 @@ namespace StudentManagement.Application.Services
             _httpClient = httpClient;
             _parsers = parsers;
             _semanticChunker = semanticChunker;
+            _memoryCache = memoryCache;
+            _logger = logger;
             _initialization = new Lazy<Task>(InitializeCoreAsync);
         }
 
@@ -86,9 +96,26 @@ namespace StudentManagement.Application.Services
         public string GetDocumentation()
         {
             LoadChunks();
-            return string.Join(
+
+            if (_memoryCache.TryGetValue(DocumentationCacheKey, out string? cached) && cached is not null)
+            {
+                _logger.LogInformation("Cache HIT {CacheKey} (in-process)", DocumentationCacheKey);
+                return cached;
+            }
+
+            _logger.LogInformation("Cache MISS {CacheKey} (in-process)", DocumentationCacheKey);
+            var documentation = string.Join(
                 Environment.NewLine + Environment.NewLine,
                 _chunks.Select(chunk => chunk.Content));
+
+            // The embedded knowledge base is immutable for the lifetime of the process, so the joined
+            // documentation is cached without expiry.
+            _memoryCache.Set(DocumentationCacheKey, documentation, new MemoryCacheEntryOptions
+            {
+                Priority = CacheItemPriority.NeverRemove
+            });
+
+            return documentation;
         }
 
         public async Task<string> SearchRelevantChunks(string query, int maxChunks = 3)

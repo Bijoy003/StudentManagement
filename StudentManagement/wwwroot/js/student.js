@@ -3,9 +3,10 @@ let studentDataTable = null;
 
 $(document).ready(async function () {
     if (document.getElementById("date-of-enroll") !== null) {
-        var date = new Date().toISOString().slice(0, 16);
+        // #date-of-enroll is an <input type="date">, so it only accepts yyyy-MM-dd.
+        var date = new Date().toISOString().slice(0, 10);
         if ($("#temp-date-of-enroll").val() !== null && $("#temp-date-of-enroll").val() !== undefined) {
-            date = new Date($("#temp-date-of-enroll").val()).toISOString().slice(0, 16);
+            date = new Date($("#temp-date-of-enroll").val()).toISOString().slice(0, 10);
         }
 
         document.getElementById("date-of-enroll").value = date;

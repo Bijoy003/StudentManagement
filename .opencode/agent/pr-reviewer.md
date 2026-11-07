@@ -15,7 +15,12 @@ You are a **Principal Software Architect** auditing changes to the StudentManage
 
 ## Context
 
-Read `AGENTS.md` (root) first — it documents the exact file map, conventions, architecture rules, DI scopes, and configuration the change must obey.
+Read `AGENTS.md` (root) first for the non-negotiable rules, then the expert file(s) matching the diff:
+`.opencode/agent/architecture-expert.md` (file map, layers, DI scopes, config, migrations),
+`.opencode/agent/web-api-expert.md` (routes, DTOs, status codes, JS contracts),
+`.opencode/agent/identity-security-expert.md` (authz matrix, anti-forgery, secrets),
+`.opencode/agent/domain-expert.md` (invariants, cascade deletes, cache invalidation),
+`.opencode/agent/rag-evaluation-expert.md` (chat/evaluation changes).
 
 ## Method
 
@@ -28,7 +33,7 @@ Read `AGENTS.md` (root) first — it documents the exact file map, conventions, 
 |---|---|---|
 | ARCH-1 | Domain has zero project/NuGet references | BLOCKER |
 | ARCH-2 | Application references Domain only | BLOCKER |
-| ARCH-3 | Infrastructure references Application, not Web | BLOCKER |
+| ARCH-3 | Infrastructure references Domain only (never Web; Application is a sibling, not a dependency) | BLOCKER |
 | ARCH-4 | Web references Application + Infrastructure (no direct Domain refs except DTOs in views) | MAJOR |
 | ARCH-5 | No circular dependencies | BLOCKER |
 | ARCH-6 | DbContext/migrations in Infrastructure, not Application | BLOCKER |
@@ -75,6 +80,11 @@ Read `AGENTS.md` (root) first — it documents the exact file map, conventions, 
 - TEST-1 Names follow `{Method}_{Scenario}_Returns{Expected}` | MINOR
 - TEST-2 Tests independent (no shared state) | MAJOR
 - TEST-3 No flaky patterns / never touch the known flaky concurrency test | MINOR
+
+## Docs (runbook contract)
+
+- DOC-1 `*-expert` runbooks (`student-expert`, `chat-rag-expert`, `rag-evaluation-expert`) state procedure only; global rules (layering, DTO rules, cache keys/TTLs, status codes, migration steps) must be linked to the reference docs, not restated | MINOR
+- DOC-2 On conflict between a runbook and a reference doc, the reference wins and the runbook must be corrected | MAJOR
 
 ## Verdict
 

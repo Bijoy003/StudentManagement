@@ -9,8 +9,10 @@ Use this when adding a feature/fix with tests. It mirrors the solution's multi-a
 
 ## Preread
 
-- `AGENTS.md` (root) — file map, conventions, architecture rules, DI scopes, config.
-- Existing tests in `StudentManagement.Tests/` for style: `StudentServiceTests.cs`, `CourseRepositoryTests.cs`, `PrimeNumberServiceTests.cs`, `ChatServiceTests.cs`, `AppKnowledgeServiceTests.cs`.
+- `AGENTS.md` (root) — non-negotiable rules + index of sub-agents.
+- `.opencode/agent/architecture-expert.md` — file map, DI lifetimes, config keys, migrations, test infrastructure.
+- `.opencode/agent/domain-expert.md` — invariants (and non-invariants) the tests must encode.
+- Existing tests in `StudentManagement.Tests/` for style: `StudentServiceTests.cs`, `CourseRepositoryTests.cs`, `PrimeNumberServiceTests.cs`, `ChatServiceTests.cs`, `AppKnowledgeServiceTests.cs`, `StudentApiControllerTests.cs`, `LoggingTests.cs`.
 
 ## RED phase — write tests first
 
@@ -22,8 +24,8 @@ Use this when adding a feature/fix with tests. It mirrors the solution's multi-a
 
 ## GREEN phase — implement
 
-1. Build bottom-up: Domain → Application → Infrastructure → Web (see implementer agent / AGENTS.md).
-2. Respect reference rules (Domain→nothing, Application→Domain only, Infrastructure→Application, Web→Application+Infrastructure, Tests→Application+Web).
+1. Build bottom-up: Domain → Application → Infrastructure → Web (see `.opencode/agent/implementer.md` for the workflow and `.opencode/agent/architecture-expert.md` for the file map).
+2. Respect reference rules (Domain→nothing, Application→Domain only, Infrastructure→Domain only, Web→Application+Infrastructure+Domain, Tests→Application+Web).
 3. Follow conventions: file-scoped namespaces, `_` prefix injected fields, `Async` suffix, constructor injection, no XML docs.
 4. If schema changes: entity + DbSet → `dotnet ef migrations add <Name>` (see add-migration skill).
 5. Run `dotnet build` then `dotnet test`. All RED tests must go GREEN.

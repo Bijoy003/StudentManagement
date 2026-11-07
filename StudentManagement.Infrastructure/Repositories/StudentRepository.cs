@@ -8,10 +8,12 @@ namespace StudentManagement.Infrastructure.Repositories
     public class StudentRepository : IStudentRepository
     {
         private readonly ApplicationDbContext _dbContext;
+        private readonly ReadOnlyDbContext _readOnlyDbContext;
 
-        public StudentRepository(ApplicationDbContext dbContext)
+        public StudentRepository(ApplicationDbContext dbContext, ReadOnlyDbContext readOnlyDbContext)
         {
             _dbContext = dbContext;
+            _readOnlyDbContext = readOnlyDbContext;
         }
 
         public async Task<IEnumerable<Student>> GetAllAsync()
@@ -19,9 +21,19 @@ namespace StudentManagement.Infrastructure.Repositories
             return await _dbContext.Students.ToListAsync();
         }
 
-        public async Task<Student> GetByIdAsync(int id)
+        public async Task<IEnumerable<Student>> GetAllAsyncReadOnly()
+        {
+            return await _readOnlyDbContext.Students.AsNoTracking().ToListAsync();
+        }
+
+        public async Task<Student?> GetByIdAsync(int id)
         {
             return await _dbContext.Students.FirstOrDefaultAsync(s => s.Id == id);
+        }
+
+        public async Task<Student?> GetByIdAsyncReadOnly(int id)
+        {
+            return await _readOnlyDbContext.Students.AsNoTracking().FirstOrDefaultAsync(s => s.Id == id);
         }
 
         public async Task AddAsync(Student student)

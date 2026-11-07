@@ -1,6 +1,7 @@
 using AspNetCoreRateLimit;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.OpenApi.Models;
 using StudentManagement.Application.Interfaces;
@@ -11,6 +12,7 @@ using StudentManagement.Application.Services;
 using StudentManagement.Domain.Interfaces;
 using StudentManagement.Infrastructure.Data;
 using StudentManagement.Infrastructure.Repositories;
+using StudentManagement.Infrastructure.Services;
 using StudentManagement.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,8 +20,35 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddSerilogLogging();
 builder.AddOpenTelemetry();
 
-// Add in-memory caching
+// Add in-memory caching (fallback)
 builder.Services.AddMemoryCache();
+
+// Distributed cache: Redis when a connection is configured (docker-compose),
+var redisConnection = builder.Configuration.GetConnectionString("Redis");
+if (!string.IsNullOrWhiteSpace(redisConnection))
+{
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnection;
+        options.InstanceName = "StudentManagement:";
+    });
+}
+else
+{
+    builder.Services.AddDistributedMemoryCache();
+}
+
+// Add DbContext for primary (read/write)
+builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(
+    builder.Configuration.GetConnectionString("DatabaseConnection")
+    ));
+
+// Add DbContext for read replica (read-only); falls back to the primary database when no replica is configured.
+var readOnlyConnection = builder.Configuration.GetConnectionString("DatabaseConnection_ReadReplica")
+    ?? builder.Configuration.GetConnectionString("DatabaseConnection");
+builder.Services.AddDbContext<ReadOnlyDbContext>(options => options.UseSqlServer(
+    readOnlyConnection
+    ));
 
 builder.Configuration
     .AddJsonFile(builder.Configuration["AdditionalConfig:Path"], optional: false, reloadOnChange: true);
@@ -75,9 +104,7 @@ builder.Services.AddSwaggerGen(options =>
         }
     });
 });
-builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(
-    builder.Configuration.GetConnectionString("DatabaseConnection")
-    ));
+
 // Identity
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
@@ -141,6 +168,7 @@ builder.Services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
 builder.Services.AddScoped<ICourseService, CourseService>();
 builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IPrimeNumberService, PrimeNumberService>();
+builder.Services.AddScoped<IArchiveService, ArchiveService>();
 
 builder.Services.AddAppChatClient(builder.Configuration);
 
@@ -151,6 +179,10 @@ builder.Services.AddScoped<ChatTools>();
 builder.Services.AddScoped<IChatService, ChatService>();
 
 var app = builder.Build();
+
+app.Logger.LogInformation(
+    "Distributed cache provider: {CacheProvider}",
+    string.IsNullOrWhiteSpace(redisConnection) ? "in-memory (per-process)" : "Redis");
 
 // Handle CLI commands
 if (args.Length > 0 && args[0] == "evaluate")
@@ -217,7 +249,20 @@ using (var scope = app.Services.CreateScope())
 
 app.UseIpRateLimiting();
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+
+// Static assets are served by a single middleware: a later, path-specific UseStaticFiles("/css")
+// would never run because the first one already serves /css/* and short-circuits the pipeline.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        if (ctx.Context.Request.Path.StartsWithSegments("/css"))
+        {
+            ctx.Context.Response.Headers["Cache-Control"] =
+                "public,max-age=86400"; // 1 day
+        }
+    }
+});
 
 app.UseSerilogLogging();
 
@@ -232,19 +277,6 @@ app.UseSerilogLogging();
 //            "public,max-age=604800"; // 7 days
 //    }
 //});
-
-app.UseStaticFiles(new StaticFileOptions
-{
-    FileProvider = new PhysicalFileProvider(
-        Path.Combine(builder.Environment.ContentRootPath, "wwwroot/css")),
-    RequestPath = "/css",
-    OnPrepareResponse = ctx =>
-    {
-        ctx.Context.Response.Headers["Cache-Control"] =
-            "public,max-age=86400"; // 1 day
-    }
-});
-
 
 app.UseRouting();
 

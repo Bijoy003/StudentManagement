@@ -25,6 +25,13 @@ namespace StudentManagement.Tests
                 .Options;
         }
 
+        private DbContextOptions<ReadOnlyDbContext> CreateReadOnlyOptions(SqliteConnection connection)
+        {
+            return new DbContextOptionsBuilder<ReadOnlyDbContext>()
+                .UseSqlite(connection)
+                .Options;
+        }
+
         [Fact]
         public async Task GetByIdAsync_WhenCourseExists_ReturnsCourse()
         {
@@ -33,6 +40,7 @@ namespace StudentManagement.Tests
             await connection.OpenAsync();
 
             var options = CreateOptions(connection);
+            var readOnlyOptions = CreateReadOnlyOptions(connection);
 
             using (var context = new ApplicationDbContext(options))
             {
@@ -43,8 +51,9 @@ namespace StudentManagement.Tests
             }
 
             using (var context = new ApplicationDbContext(options))
+            using (var readOnlyContext = new ReadOnlyDbContext(readOnlyOptions))
             {
-                var repository = new CourseRepository(context);
+                var repository = new CourseRepository(context, readOnlyContext);
 
                 // Act
                 var result = await repository.GetByIdAsync(1);
@@ -64,6 +73,7 @@ namespace StudentManagement.Tests
             await connection.OpenAsync();
 
             var options = CreateOptions(connection);
+            var readOnlyOptions = CreateReadOnlyOptions(connection);
 
             using (var context = new ApplicationDbContext(options))
             {
@@ -71,8 +81,9 @@ namespace StudentManagement.Tests
             }
 
             using (var context = new ApplicationDbContext(options))
+            using (var readOnlyContext = new ReadOnlyDbContext(readOnlyOptions))
             {
-                var repository = new CourseRepository(context);
+                var repository = new CourseRepository(context, readOnlyContext);
 
                 var result = await repository.GetByIdAsync(99);
 

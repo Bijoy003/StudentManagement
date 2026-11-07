@@ -1,177 +1,68 @@
 # StudentManagement
 
-ASP.NET Core MVC student management system with AI chat, RAG, and multi-agent DevOps tooling. Clean Architecture, .NET 8, SQL Server.
+ASP.NET Core MVC system for students, courses, and enrollments (.NET 8, Clean Architecture, SQL Server)
+with Identity auth, an AI chat/RAG assistant, a RAG evaluation harness, and Playwright E2E tests.
 
-## Quick Reference
+## Stack
 
-- **Solution:** `StudentManagement.sln` — 6 projects
-- **Stack:** .NET 8, EF Core 8 (SQL Server), ASP.NET Core Identity + Google auth, xUnit + Moq
-- **AI:** Ollama (default `qwen2.5:3b-instruct`), Microsoft.Extensions.AI, ChromaDB RAG, MCP stdio servers
-- **Build:** `dotnet build` | **Unit tests:** `dotnet test` | **E2E:** `scripts/e2e.ps1`
-- **CI:** `.github/workflows/dotnet.yml` (build + unit tests on push/PR to `develop`; separate `e2e` job runs Playwright)
+- **.NET 8** MVC + attribute-routed REST API (`/api/students`, `/api/evaluation`), nullable + implicit usings
+- **EF Core 8 / SQL Server** — writable `ApplicationDbContext` + read-only `ReadOnlyDbContext`; migrations auto-apply at startup
+- **Identity** (cookie + Google, TOTP MFA, roles Admin/Teacher/Student/User) · **IP rate limiting** · **Redis-or-memory cache**
+- **AI**: Microsoft.Extensions.AI → OpenAI-compatible endpoint (Ollama default), ChromaDB RAG, function tools, stdio MCP
+- **Ops**: Serilog (JSON + rolling files), OpenTelemetry, Prometheus · **Tests**: xUnit + Moq, Playwright in `e2e/`
 
-## Project Structure (Full File Map)
+## Commands
 
-```
-StudentManagement.Domain/                        # Zero NuGet deps, no project refs
-  Entities/Student.cs                            # Id, Name(50), Email(100), Phone(20), Address(200), DateOfEnroll?, Enrollments nav
-  Entities/Course.cs                             # Id, Name, Credits (no nav back)
-  Entities/Enrollment.cs                         # Id, StudentId, CourseId, Grade?; navs Student, Course
-  DTOs/CourseStudentCountDto.cs                  # CourseName, StudentCount, course
-  Interfaces/IStudentRepository.cs               # GetStudentsAsync, GetStudentByIdAsync, AddAsync, UpdateAsync, DeleteAsync, GetStudentsEnrolledInMoreThan
-  Interfaces/ICourseRepository.cs                # GetAllCoursesAsync, GetByIdAsync, AddAsync, UpdateAsync, DeleteAsync, GetStudentCountPerCourseAsync
-  Interfaces/IEnrollmentRepository.cs            # GetEnrollmentsAsync, AddAsync, DeleteAsync, GetStudentsInCourseAsync, GetCoursesForStudentAsync
+| Task | Command |
+|---|---|
+| Build / unit tests | `dotnet build` · `dotnet test` |
+| Run | `dotnet run --project StudentManagement` (http://localhost:5255) |
+| E2E | `scripts/e2e.ps1` (`-Headed`, `-KeepDb`) · or `cd e2e; npx playwright test` |
+| Docker stack | `docker-compose up` (web :8080 + SQL Server + Redis) — needs `AdditionalConfig__Path` set, see Landmines |
+| New migration | `dotnet ef migrations add <Name>` in Infrastructure — never run `database update` by hand |
+| RAG evaluation | `dotnet run --project StudentManagement -- evaluate --help` |
 
-StudentManagement.Application/                   # References Domain only
-  Interfaces/IStudentService.cs, ICourseService.cs, IEnrollmentService.cs, IPrimeNumberService.cs
-  Interfaces/IChatService.cs                     # GetReplyAsync(IReadOnlyList<ChatMessage>, CancellationToken)
-  Interfaces/IAppKnowledgeService.cs             # InitializeAsync(), GetDocumentation(), SearchRelevantChunks(query, maxChunks)
-  Interfaces/IMailgunEmailService.cs, IMcpToolProvider.cs
-  Services/StudentService.cs, CourseService.cs, EnrollmentService.cs, PrimeNumberService.cs
-  Services/ChatService.cs                        # Builds system prompt (RAG + docs + tools), calls IChatClient
-  Services/ChatTools.cs                          # 9 [Description] AI tools -> JSON via services
-  Services/AppKnowledgeService.cs                # Loads embedded docs, parses, chunks, embeds, ChromaDB upsert + RAG search (dist < 0.7)
-  Services/SemanticChunker.cs                    # Paragraph split, sliding-window embedding shift detection (<0.55 = topic shift)
-  Services/IDocumentParser.cs, TxtDocumentParser.cs, DocxDocumentParser.cs, PdfDocumentParser.cs, ExcelDocumentParser.cs
-  Services/KnowledgeChunk.cs                     # sealed record KnowledgeChunk(string Title, string Content)
-  Configuration/ChatFeatureOptions.cs            # Chat:Features
-  Configuration/ChromaOptions.cs                 # Chroma section
-  Configuration/McpOptions.cs                    # Chat:Mcp section
-  AppKnowledge/*.md/.txt/.docx/.pdf              # Embedded resources (RAG source docs)
+Seeded admin: `admin@admin.com` / `Admin123` (and `bhugolbijoy003@gmail.com`).
 
-StudentManagement.Infrastructure/                # References Application (transitively Domain)
-  Data/ApplicationDbContext.cs                   # IdentityDbContext<ApplicationUser>; DbSets: Students, Courses, Enrollments
-  Data/DbInitializer.cs                          # SeedAdmin: 4 roles + 2 admin users (admin@admin.com / Admin123)
-  Repositories/StudentRepository.cs, CourseRepository.cs, EnrollmentRepository.cs
-  Migrations/                                    # 4 migrations (see below)
+## Non-negotiable rules
 
-StudentManagement/                               # Web (MVC), references Application + Infrastructure
-  Program.cs                                     # DI, rate limiting, Identity, migration+seed retry (10x, 5s)
-  Configuration/ChatClientServiceCollectionExtensions.cs   # AddAppChatClient — AI/chat singleton chain
-  Configuration/ChatOptions.cs                   # Chat section
-  Configuration/McpToolProvider.cs               # Stdio MCP servers via ModelContextProtocol package
-  Controllers/HomeController.cs, StudentController.cs, CourseController.cs, EnrollmentController.cs, ChatController.cs, AccountController.cs, AdminController.cs
-  Models/                                        # ChatRequest + Identity view models
-  Views/{Home,Student,Course,Enrollment,Chat,Account,Admin,Shared}/...
-  wwwroot/js/{chat,student,course,enrollment,site}.js
-  appsettings.json / .Development.json / .Production.json
+1. **Layering:** Domain (no deps) ← Application; Domain ← Infrastructure; Web → Application + Infrastructure + Domain; Tests → Application + Web.
+   Never let Domain depend on anything, or Application depend on Infrastructure/Web.
+2. **The REST API never binds or serializes domain entities** — use `Application/DTOs/`; don't add new endpoints that bind entities directly either.
+3. **Writes go Application service → repository.** Repositories use `ApplicationDbContext` for writes, `ReadOnlyDbContext` + `AsNoTracking()` for `*ReadOnly` reads; `Include()` belongs in the repository, not the service.
+4. **Style:** file-scoped namespaces, constructor injection with `_camelCase` fields, `Async` suffix on async methods, no XML docs (except `[Description]` on `ChatTools` methods), test names `{Method}_{Scenario}_Returns{Expected}`.
+5. **Schema change ⇒ EF Core migration** (startup applies it with 10 retries × 5 s). No raw SQL, no hand-edited migration history.
+6. **Never modify `CourseRepositoryTests.UpdateCourse_ConcurrentLoop_ShouldExposeRaceCondition`** — known-flaky SQLite test: retry once, then flag.
+7. **No secrets in `appsettings*.json`.** Keep placeholders/empty strings in committed config; real values live in user-secrets locally (Web project has a `UserSecretsId`) or env vars (`Section__Key`) in Docker/CI. Older commits on other branches still contain leaked keys, so rotate anything reused.
 
-StudentManagement.Tests/                         # References Application + Web (unit tests)
-  StudentServiceTests.cs, CourseRepositoryTests.cs, PrimeNumberServiceTests.cs, ChatServiceTests.cs, AppKnowledgeServiceTests.cs
+## Where the detail lives
 
-e2e/                                             # Node.js Playwright E2E — spec.ts, `npx playwright test`
-  package.json                                   # @playwright/test 1.61.0 (reuses chromium-1228 cache)
-  playwright.config.ts                           # baseURL :5255, 1 worker, chromium, headless unless HEADED, 30s timeouts
-  tsconfig.json                                  # TS config for editor/typecheck
-  tests/fixtures.ts                              # Helpers (login/loginAs/logout/unique/create*) + re-exports test/expect
-  tests/{auth,student,course,enrollment,chat,admin,account}.spec.ts   # 34 browser tests
-scripts/e2e.ps1, scripts/appsettings.e2e.json    # E2E orchestration (DB container + app + npx playwright test)
+This file is the index, not the manual. Read the matching sub-agent file before working in an area — each is also directly delegable.
 
-tickets/Ticket-1852-pipeline-run.md              # Sample per-ticket pipeline run log
-01-prd-parser.md ... 05-pr-reviewer.md           # Multi-agent DevOps pipeline role specs
-autonomous_devops_pipeline_generic.md            # Pipeline architecture template
-StudentMangement/                                # ORPHANED empty folder (note typo) — ignore
-```
+| You need… | Read / delegate to |
+|---|---|
+| **Student** work (MVC + REST, DTOs, cache) | `.opencode/agent/student-expert.md` (runbook) → `web-api-expert.md`, `domain-expert.md` |
+| **Course** work (counts cache, client ResponseCache) | Feature slice map → `domain-expert.md` (caching), `web-api-expert.md` (quirks) |
+| **Enrollment** work (cascade, stale counts, unawaited delete) | Feature slice map → `domain-expert.md` (invariants, caching) |
+| **Auth / admin** (login, MFA, Google, reset, roles) | `.opencode/agent/identity-security-expert.md` |
+| **Chat / RAG** (prompt, tools, ChromaDB, MCP) | `.opencode/agent/chat-rag-expert.md` |
+| **Evaluation** (dataset, metrics, CLI, CI gate) | `.opencode/agent/rag-evaluation-expert.md` |
+| Cross-cutting: entities, invariants, archiving, risks | `.opencode/agent/domain-expert.md` |
+| Cross-cutting: file map, DI lifetimes, config, migrations, logging | `.opencode/agent/architecture-expert.md` |
+| Cross-cutting: routes, status codes, DTO/PATCH, Razor/jQuery | `.opencode/agent/web-api-expert.md` |
+| TDD tests / feature code / build fixes / diff review | `.opencode/agent/{test-planner,implementer,self-healer,pr-reviewer}.md` |
+| Task recipes | `.opencode/skills/*/SKILL.md` — add-migration, ai-chat-tools, rag-knowledge, playwright-e2e, run-and-verify, tdd-feature |
 
-## Key Conventions
+The `*-expert` agents explain, map, and audit; they do not edit (except `chat-rag-expert` and `rag-evaluation-expert` in their own area). **Runbooks** (`student-expert`, `chat-rag-expert`, `rag-evaluation-expert`) describe *procedure* — files, flows, checklists; the reference docs (`domain`, `architecture`, `web-api`, `identity-security`) are authoritative on *rules*, and win on conflict. Hand code changes to `implementer`.
 
-- **.NET 8**, nullable enabled, implicit usings enabled
-- **File-scoped namespaces** (`namespace X;`) for new files
-- **Constructor injection** with `private readonly` fields prefixed `_`
-- **Async suffix** on all async methods
-- **Test naming:** `{Method}_{Scenario}_Returns{Expected}`
-- **No XML doc comments** on most code; `[Description]` attributes used on AI tool methods (`ChatTools.cs`)
-- Web project has `GlobalUsings.cs` (imports Domain.Entities + Application.Interfaces)
+## Default workflow
 
-## Architecture Rules (project references)
+`test-planner` (RED) → `implementer` (GREEN) → `self-healer` only if build/test fails → `pr-reviewer` before commit.
 
-- **Domain** → no NuGet, no project refs
-- **Application** → references Domain only
-- **Infrastructure** → references Application (transitively Domain)
-- **Web** → references Application + Infrastructure (DI wiring)
-- **Tests** → references Application + Web
-- Never add Domain→Infrastructure/Web or Application→Infrastructure/Web references
+## Landmines
 
-## DI Registration
-
-- **Program.cs** (all scoped unless noted): repositories, services, `IPrimeNumberService`, Identity, Google auth, rate limiting, Mailgun `HttpClient`. `IAppKnowledgeService` is **Singleton**. `ChatTools` + `IChatService`/`ChatService` are **Scoped**.
-- **ChatClientServiceCollectionExtensions.AddAppChatClient** (all Singleton): OpenAI-compatible `ChatClient` (Ollama `/v1`) with `.AsIChatClient().UseFunctionInvocation().UseLogging()`, `IEmbeddingGenerator` (embedding model), `ChromaClient`/`ChromaConfigurationOptions`, `HttpClient`, `SemanticChunker`, 4 `IDocumentParser`s, `McpToolProvider`.
-
-## Configuration (appsettings.json)
-
-- `ConnectionStrings:DatabaseConnection` — SQL Server
-- `IpRateLimiting` — all endpoints 20/s; `post:/Chat/Send` 10/min
-- `Mailgun` — ApiKey, Domain, FromEmail
-- `Authentication:Google` — ClientId, ClientSecret
-- `Chat` — Endpoint (Ollama), Model, ApiKey
-- `Chat:Features` — IncludeFullDocumentation, IncludeRag, MaxRagChunks=3, IncludeTools, EmbeddingModel
-- `Chat:Mcp` — Enabled + Servers (jira via `uvx mcp-atlassian`; github via npx, disabled). Enabled in Development, disabled in Production.
-- `Chroma` — Endpoint `http://localhost:8000`, CollectionName `student-management`
-- `AdditionalConfig:Path` — extra required JSON loaded by Program.cs (`C:\inetpub\appsettings.json`)
-
-## Data Layer
-
-- **Migrations:** `20231216072534_AddStudentToDatabase`, `20250817125127_AddCoursesAndEnrollments`, `20250817152747_AddStudentCourseRelationships` (no-op), `20251108103650_CreateIdentityTables` (renamed Students table + Identity tables). Namespace `StudentManagement.Migrations`.
-- **Seed:** `DbInitializer.SeedAdmin` creates roles Admin/Teacher/Student/User and admins `admin@admin.com` + `bhugolbijoy003@gmail.com` (password `Admin123`).
-- **Startup:** `Program.cs` runs `MigrateAsync()` + `SeedAdmin` with up to 10 retries / 5s delay (handles Docker SQL Server cold start).
-
-## Controllers & Routes
-
-- `StudentController`: Index, GetStudentList (JSON), Create, SaveStudent (POST JSON), DeleteStudent, EnrolledInMoreThan
-- `CourseController`: Index, Create, Save (POST), Delete (bool), StudentCountPerCourse
-- `EnrollmentController`: Index, Create, Save (POST), Delete (bool), StudentsInCourse, CoursesForStudent
-- `ChatController`: Index (GET /Chat), Send (POST /Chat/Send, JSON `ChatRequest`, supports file/image attachments parsed via `IDocumentParser`)
-- `AccountController`: Login, MFA (authenticator TOTP + QRCoder), Profile, Password, Google ExternalLogin
-- `AdminController`: `[Authorize(Roles = "Admin")]` CreateUser
-- `StudentApiController`: `[ApiController] [Route("api/students")]` — REST CRUD API (see below)
-
-## REST API (`/api/*`)
-
-- Attribute-routed `[ApiController]` controllers are mapped by `app.MapControllers()` in `Program.cs` (conventional MVC route is registered separately and unchanged).
-- **Students:** `GET /api/students` (`page`, `pageSize` max 100, `search` on name/email, `minCourses`), `GET /api/students/{id}`, `POST /api/students`, `PUT /api/students/{id}` (full replace), `PATCH /api/students/{id}` (`application/merge-patch+json`, omitted fields unchanged), `DELETE /api/students/{id}`.
-- Status codes: 200 with `PagedResult<StudentDto>` + `X-Total-Count` header on list, 201 + `Location` on create, 204 on update/delete, 400 `ValidationProblemDetails` (auto from `[ApiController]`), 401 unauthenticated, 403 wrong role, 404/415/500 as `ProblemDetails`.
-- **Auth:** class-level `[Authorize]` (any signed-in user can read); writes require `Admin` or `Teacher`. `/api/*` returns 401/403 instead of the cookie handler's HTML redirects, and `/api/*` is excluded from the `/Home/Error` status-code re-execute.
-- **Contracts** live in `StudentManagement.Application/DTOs/` (`Students/StudentDto`, `StudentRequest`, `StudentPatchRequest`, `StudentQuery`, `StudentMappingExtensions`, `Common/PagedResult<T>`) — the domain `Student` entity is never bound or serialized directly.
-- `EvaluationController` is the other `[ApiController]` (`[Authorize(Roles = "Admin")]`, `/api/evaluation`).
-- **Swagger UI (Development only):** `https://localhost:7201/swagger` (docs JSON at `/swagger/v1/swagger.json`). `Swashbuckle.AspNetCore` 6.7.1; `DocInclusionPredicate` restricts the document to `/api/*` (MVC view actions are excluded — otherwise `HomeController.Error`'s attribute route breaks generation with "Ambiguous HTTP method"). Auth is cookie-based, so log in at `/Account/Login` in the same browser and "Try it out" is authenticated automatically (the `cookieAuth` scheme is documentation only — no API key/cookie value needs entering). Anonymous requests from a private window return 401.
-
-## AI Chat & RAG Architecture
-
-- **ChatService** → builds prompt from RAG chunks (`AppKnowledgeService.SearchRelevantChunks`, threshold 0.7) + full docs + tools; invokes `IChatClient` with function invocation.
-- **ChatTools** → 9 tools (ListStudentsAsync, GetStudentByIdAsync, GetStudentsEnrolledInMoreThanAsync, ListCoursesAsync, GetCourseByIdAsync, GetStudentCountPerCourseAsync, ListEnrollmentsAsync, GetStudentsInCourseAsync, GetCoursesForStudentAsync), each returns JSON via service layer.
-- **AppKnowledgeService** → loads embedded `AppKnowledge/**` resources, extracts text via `IDocumentParser`, chunks via `SemanticChunker`, embeds + upserts to ChromaDB collection, queries on demand.
-- **SemanticChunker** → splits paragraphs, detects topic shift when sliding-window embedding cosine similarity < 0.55.
-- **MCP** → `McpToolProvider` loads stdio server tools prefixed `{serverKey}_`, cached; wired into chat only when `Chat:Mcp:Enabled`.
-
-## Testing
-
-- Framework: xUnit + Moq. Run `dotnet test`. (CI's build job uses `--filter "Category!=E2E"` as a legacy no-op — the E2E suite now lives in `e2e/`.)
-- Repository tests use EF Core SQLite in-memory (`Filename=:memory:`, `EnsureCreated`).
-- Service tests use Moq on repository interfaces.
-- `AppKnowledgeServiceTests` loads embedded resources.
-- `CourseRepositoryTests.UpdateCourse_ConcurrentLoop_ShouldExposeRaceCondition` is a **pre-existing flaky test** (SQLite concurrency) — do not modify; on CI failure, retry once then flag.
-- Test project already references Application + Web (no csproj changes needed).
-
-## E2E Testing (Playwright)
-
-- Node.js Playwright test runner (NOT xUnit/C#). Tests are `spec.ts` files in `e2e/`, run with `npx playwright test` (or `npm test` from `e2e/`). Requires Node.js (20+); the runner resolves via `npx` after `npm install` in `e2e/`.
-- **Run:** `scripts/e2e.ps1` — starts a Docker mssql container (`studentmanagement-e2e-db`, port 1433), builds + runs the web app (`Production` env, HTTP `http://localhost:5255`, extra config from `scripts/appsettings.e2e.json`), installs npm deps + Playwright browsers on first run, runs `npx playwright test` (`e2e/playwright.config.ts`), then cleans up (app process tree + container). Add `-KeepDb` to reuse the DB container.
-- **Run against a running app:** `cd e2e; npx playwright test` (or `npm test`). For a single spec: `npx playwright test tests/auth.spec.ts`.
-- **Watch it live (headed):** `scripts/e2e.ps1 -Headed` opens a real, visible browser window (CI stays headless). CLI equivalent: `npx playwright test --headed`. `$env:BROWSER` (`firefox`/`webkit`) switches engines; `$env:E2E_BASE_URL` overrides the app URL.
-- **Test generator (codegen):** `scripts/codegen.ps1` launches the Playwright codegen recorder (`--target playwright`) against the app. It starts the DB container + web app (same infra as `e2e.ps1`), opens a recorder browser where you click/type, and on closing the recorder writes the generated spec to `e2e\tests\codegen.spec.ts` (override with `-Output`), then cleans up. Recorded code is bare Playwright — **adapt it to the suite conventions** (import `{ test, expect }` from `./fixtures`, use the `login`/`unique`/`create*` helpers, keep role/id-based selectors). Pass `-StorageFile auth.json` to save/load login state so recording starts authenticated (log in once in the recorder).
-- Tests: 34 browser tests across `{auth,student,course,enrollment,chat,admin,account}.spec.ts`. `tests/fixtures.ts` provides the shared helpers `login`/`loginAs(email, pw)`/`logout`, `unique(label)`, constants `AdminEmail`/`AdminPassword`/`CreatedUserPassword`, and UI helpers `createUserViaAdmin(role)`, `createStudent(name, email)`, `createCourse(name)`, `selectStudentRow(text)`. Base URL comes from env `E2E_BASE_URL` (default `http://localhost:5255`). The suite runs **sequentially** (`workers: 1` in `playwright.config.ts`) against the shared app/DB to avoid the app's IP rate limiter (20/s; `post:/Chat/Send` 10/min) and DB contention. Seeded admin `admin@admin.com` / `Admin123`; users created via the Admin UI use password `Test1234`.
-- **Key gotchas:**
-  - `Home/Index` renders at the **root URL `/`**, not `/Home/Index` — assert on the `Hello, admin@admin.com` navbar text, not a URL pattern.
-  - App startup applies migrations + seeds admin with 10x/5s retry; wait for HTTP 200 before running tests.
-  - Killing the app must use `taskkill /T /F` (or kill by port) — `dotnet run` spawns a child Kestrel process that plain `Stop-Process` misses (causes "address already in use" on the next run).
-  - **Do not** set the `#date-of-enroll` input to a datetime-local value: it's `type="date"` and rejects it, leaving the field empty; `student.js` `serializeFormData()` then sends the string `"null"` for `DateOfEnroll`, breaking `DateTime?` JSON binding (HTTP 400 "The student field is required."). `student.js` already emits `yyyy-MM-dd` via `.toISOString().slice(0, 10)`.
-  - **Enrollment forms are JSON + strict binding:** `enrollment.js` must send `StudentId`/`CourseId`/`Id` as numbers and `Grade` as a number or `null` (not strings) or the server 400s. The controller `EnrollmentController.Save` drops the `Student`/`Course` nav-property ModelState entries — they're never in the payload and their implicit "required" validation would otherwise reject every save.
-- **Playwright MCP (global, for opencode):** this machine's global config (`~/.config/opencode/opencode.jsonc`) registers `@playwright/mcp` as two servers — `playwright` (headed, enabled) and `playwright-headless` (disabled), both `--codegen playwright` (generates TS). The agent gets `browser_*` tools to drive the live app against staged changes and generate E2E tests. To switch modes, flip `enabled` for the two servers and restart opencode (config isn't hot-reloaded). The MCP uses its own Playwright 1.63.0-alpha + Chromium v1237 (already installed; distinct from the `e2e/` 1.61 `chromium-1228`). Generated tests must follow the `e2e/` conventions (import `{ test, expect }` from `./fixtures`, use `login`/`unique`/helpers, place specs under `e2e/tests/`).
-
-## Common Tasks
-
-- **Run:** `dotnet run --project StudentManagement`
-- **Docker:** `docker-compose up` (web :8080 + mssql 2022 with healthcheck)
-- **New migration:** edit schema → `dotnet ef migrations add <Name>` → startup auto-applies
-- **New AI tool:** add `[Description]` method in `ChatTools.cs` + add to `GetTools()` list
-- **New RAG doc:** drop file in `Application/AppKnowledge/` (embedded automatically)
+- **`AdditionalConfig:Path` is required** (`optional: false`) — `Program.cs` loads `C:\inetpub\appsettings.json` and throws on startup when missing; override with `AdditionalConfig__Path` (E2E uses `scripts/appsettings.e2e.json`). `docker-compose.yml` does **not** set it, so the web container only starts if that file is baked into the image.
+- **`MailgunEmailService.SendEmailAsync` returns immediately** (`return;` on line 1) — forgot-password never sends mail.
+- **No antiforgery token on JSON POST actions** (`[ValidateAntiForgeryToken]` is commented out in `StudentController.SaveStudent`); admin/account forms do use it.
+- **Deleting a student or course cascades its enrollments**; `IArchiveService` is registered but called by nothing.
+- **`dotnet run` spawns a child Kestrel process** — kill with `taskkill /T /F` or by port, or the next run hits "address already in use".

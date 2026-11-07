@@ -6,11 +6,14 @@ namespace StudentManagement.Domain.Interfaces
     public interface ICourseRepository
     {
         Task<IEnumerable<Course>> GetAllAsync();
-        Task<Course> GetByIdAsync(int id);
+        Task<IEnumerable<Course>> GetAllAsyncReadOnly();
+        Task<Course?> GetByIdAsync(int id);
+        Task<Course?> GetByIdAsyncReadOnly(int id);
         Task AddAsync(Course course);
         void Update(Course course);
         Task DeleteAsync(int id);
         Task SaveChangesAsync();
         Task<List<CourseStudentCountDto>> GetStudentCountPerCourseAsync();
+        Task<List<CourseStudentCountDto>> GetStudentCountPerCourseAsyncReadOnly();
     }
 }

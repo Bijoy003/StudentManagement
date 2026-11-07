@@ -1,5 +1,7 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Diagnostics;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using StudentManagement.Web.Models;
 
 namespace StudentManagement.Web.Controllers
 {
@@ -23,7 +25,10 @@ namespace StudentManagement.Web.Controllers
                 ViewData["ErrorMessage"] = "An unexpected error occurred.";
             }
 
-            return View();
+            return View(new ErrorViewModel
+            {
+                RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier
+            });
         }
     }
 }

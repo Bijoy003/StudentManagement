@@ -235,7 +235,7 @@ public class StudentApiControllerTests
     {
         // Arrange
         var mock = CreateServiceMock();
-        mock.Setup(s => s.GetStudentByIdAsync(1014)).Returns(Task.FromResult<Student>(null!));
+        mock.Setup(s => s.GetStudentByIdAsync(1014)).Returns(Task.FromResult<Student?>(null!));
 
         var controller = CreateController(mock);
 
@@ -326,7 +326,7 @@ public class StudentApiControllerTests
     {
         // Arrange
         var mock = CreateServiceMock();
-        mock.Setup(s => s.GetStudentByIdAsync(999)).Returns(Task.FromResult<Student>(null!));
+        mock.Setup(s => s.GetStudentByIdAsync(999)).Returns(Task.FromResult<Student?>(null!));
 
         var controller = CreateController(mock);
 
@@ -380,7 +380,7 @@ public class StudentApiControllerTests
     {
         // Arrange
         var mock = CreateServiceMock();
-        mock.Setup(s => s.GetStudentByIdAsync(999)).Returns(Task.FromResult<Student>(null!));
+        mock.Setup(s => s.GetStudentByIdAsync(999)).Returns(Task.FromResult<Student?>(null!));
 
         var controller = CreateController(mock);
 
@@ -416,7 +416,7 @@ public class StudentApiControllerTests
     {
         // Arrange
         var mock = CreateServiceMock();
-        mock.Setup(s => s.GetStudentByIdAsync(999)).Returns(Task.FromResult<Student>(null!));
+        mock.Setup(s => s.GetStudentByIdAsync(999)).Returns(Task.FromResult<Student?>(null!));
 
         var controller = CreateController(mock);
 

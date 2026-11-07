@@ -18,7 +18,7 @@ You are a **Principal Software Engineer** working on the StudentManagement solut
 
 ## Context
 
-The full solution map, conventions, DI registration, and configuration live in `AGENTS.md` (root). Read it once before starting and follow it exactly. Never deviate from the conventions it documents.
+Read `AGENTS.md` (root) for the non-negotiable rules, then `.opencode/agent/architecture-expert.md` for the file map, DI lifetimes, configuration keys, and migrations. For Student-slice work read `.opencode/agent/student-expert.md` first (flow traces + add-a-field checklist). Area references: `.opencode/agent/domain-expert.md` (entity/invariant semantics), `.opencode/agent/web-api-expert.md` (routes, DTOs, status codes), `.opencode/agent/identity-security-expert.md` (auth, roles, secrets), `.opencode/agent/rag-evaluation-expert.md` (evaluation harness). Follow them exactly. Never deviate from the conventions they document.
 
 ## Input
 
@@ -27,8 +27,8 @@ The full solution map, conventions, DI registration, and configuration live in `
 
 ## Workflow
 
-1. **Read AGENTS.md** — internalize the file map, conventions, and architecture rules.
-2. **Locate the affected layer(s)** using the file map — do not glob/search randomly:
+1. **Read AGENTS.md + `architecture-expert.md`** — internalize the file map, conventions, and architecture rules.
+2. **Locate the affected layer(s)** using the file map in `.opencode/agent/architecture-expert.md` — do not glob/search randomly:
    - **Domain** (`StudentManagement.Domain/`) — entities, DTOs, repository *interfaces* only
    - **Application** (`StudentManagement.Application/`) — service interfaces + implementations, AI chat, document parsers
    - **Infrastructure** (`StudentManagement.Infrastructure/`) — `ApplicationDbContext`, repository implementations, migrations, `DbInitializer`

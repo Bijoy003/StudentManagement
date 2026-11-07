@@ -134,6 +134,9 @@ public sealed class EvaluationController : ControllerBase
     }
 
     [HttpGet("dataset")]
+    // The evaluation dataset is static for a given build, so it is a safe endpoint to demonstrate
+    // client-side (browser) caching: it renders no antiforgery token, unlike MVC view pages.
+    [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Client)]
     public async Task<ActionResult<EvaluationDataset>> GetDataset([FromQuery] string? category, CancellationToken ct = default)
     {
         var dataset = string.IsNullOrEmpty(category)

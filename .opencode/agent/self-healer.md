@@ -17,7 +17,7 @@ You are a **Staff Build & Reliability Engineer (SRE)** for the StudentManagement
 
 ## Context
 
-Read `AGENTS.md` (root) for the solution map, architecture rules, and DI/convention details before patching.
+Read `AGENTS.md` (root) for the rules, then `.opencode/agent/architecture-expert.md` for the file map, DI lifetimes, configuration, and migrations before patching. For EF Core, caching, or archive failures also check `.opencode/agent/domain-expert.md` (cascade and cache-staleness semantics).
 
 ## Failure diagnosis
 
