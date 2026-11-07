@@ -1,0 +1,53 @@
+@{
+    ViewData["Title"] = "Course Students";
+    Layout = "_Layout";
+}
+
+@section Breadcrumb {
+    <li class="breadcrumb-item"><a href="@Url.Action("Index", "Home")">Home</a></li>
+    <li class="breadcrumb-item"><a href="@Url.Action("Dashboard", "Teacher")">Teacher Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="@Url.Action("ManageCourses", "Teacher")">Manage Courses</a></li>
+    <li class="breadcrumb-item active">Course Students</li>
+}
+
+<h2 class="mb-4">Students in @ViewBag.Course.Name</h2>
+
+<a href="@Url.Action("ManageGrades", "Teacher")" class="btn btn-success mb-3">Manage Grades</a>
+<a href="@Url.Action("ManageCourses", "Teacher")" class="btn btn-secondary mb-3">Back to Courses</a>
+
+@if (ViewBag.Enrollments != null && ((List<StudentManagement.Domain.Entities.Enrollment>)ViewBag.Enrollments).Any())
+{
+    <div class="card">
+        <div class="card-body">
+            <table class="table table-striped" id="studentsTable">
+                <thead>
+                    <tr>
+                        <th>Student Name</th>
+                        <th>Email</th>
+                        <th>Grade</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var enrollment in (List<StudentManagement.Domain.Entities.Enrollment>)ViewBag.Enrollments)
+                    {
+                        <tr>
+                            <td>@enrollment.Student?.Name</td>
+                            <td>@enrollment.Student?.Email</td>
+                            <td>@(enrollment.Grade?.ToString("F2") ?? "N/A")</td>
+                            <td>
+                                <a href="@Url.Action("ManageGrades", "Teacher", new { courseId = ViewBag.Course.Id })" class="btn btn-sm btn-outline-success">Update Grade</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-info">
+        No students enrolled in this course yet.
+    </div>
+}

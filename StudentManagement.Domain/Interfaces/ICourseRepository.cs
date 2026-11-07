@@ -9,6 +9,7 @@ namespace StudentManagement.Domain.Interfaces
         Task<IEnumerable<Course>> GetAllAsyncReadOnly();
         Task<Course?> GetByIdAsync(int id);
         Task<Course?> GetByIdAsyncReadOnly(int id);
+        Task<List<Course>> GetByTeacherIdAsyncReadOnly(string teacherId);
         Task AddAsync(Course course);
         void Update(Course course);
         Task DeleteAsync(int id);

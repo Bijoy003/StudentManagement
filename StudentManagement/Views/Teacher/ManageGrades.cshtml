@@ -1,0 +1,107 @@
+@{
+    ViewData["Title"] = "Manage Grades";
+    Layout = "_Layout";
+}
+
+@section Breadcrumb {
+    <li class="breadcrumb-item"><a href="@Url.Action("Index", "Home")">Home</a></li>
+    <li class="breadcrumb-item"><a href="@Url.Action("Dashboard", "Teacher")">Teacher Dashboard</a></li>
+    <li class="breadcrumb-item active">Manage Grades</li>
+}
+
+<h2 class="mb-4">Manage Grades</h2>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show">
+        @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" asp-action="ManageGrades" class="row g-3">
+            <div class="col-auto">
+                <label for="courseId" class="col-form-label">Select Course:</label>
+            </div>
+            <div class="col-auto">
+                <select name="courseId" id="courseId" class="form-select" onchange="this.form.submit()">
+                    <option value="">-- Select a Course --</option>
+                    @if (ViewBag.Courses != null)
+                    {
+                        foreach (var course in (IEnumerable<StudentManagement.Domain.Entities.Course>)ViewBag.Courses)
+                        {
+                            if (ViewBag.SelectedCourseId != null && course.Id == ViewBag.SelectedCourseId)
+                            {
+                                <option value="@course.Id" selected>@course.Name</option>
+                            }
+                            else
+                            {
+                                <option value="@course.Id">@course.Name</option>
+                            }
+                        }
+                    }
+                </select>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (ViewBag.Enrollments != null && ((IEnumerable<StudentManagement.Domain.Entities.Enrollment>)ViewBag.Enrollments).Any())
+{
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Students and Grades</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Student Name</th>
+                        <th>Email</th>
+                        <th>Current Grade</th>
+                        <th>Update Grade</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var enrollment in (IEnumerable<StudentManagement.Domain.Entities.Enrollment>)ViewBag.Enrollments)
+                    {
+                        <tr>
+                            <td>@enrollment.Student?.Name</td>
+                            <td>@enrollment.Student?.Email</td>
+                            <td>@(enrollment.Grade != null ? enrollment.Grade.Value.ToString("F2") : "N/A")</td>
+                            <td>
+                                @* One form per row: each Save posts only its own enrollmentId + grade,
+                                   and the form tag helper injects a valid antiforgery token automatically. *@
+                                <form asp-action="UpdateGrade" asp-controller="Teacher" method="post" class="d-flex gap-2">
+                                    <input type="hidden" name="enrollmentId" value="@enrollment.Id" />
+                                    <input type="hidden" name="courseId" value="@enrollment.CourseId" />
+                                    <input type="number" name="grade" step="0.01" min="0" max="100"
+                                           class="form-control form-control-sm"
+                                           value="@(enrollment.Grade != null ? enrollment.Grade.Value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) : "")"
+                                           placeholder="0-100" />
+                                    <button type="submit" class="btn btn-sm btn-success">Save</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+else if (ViewBag.Enrollments != null)
+{
+    <div class="alert alert-info">
+        No enrollments found. Select a course to view students.
+    </div>
+}

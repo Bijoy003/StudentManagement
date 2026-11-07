@@ -50,8 +50,8 @@ builder.Services.AddDbContext<ReadOnlyDbContext>(options => options.UseSqlServer
     readOnlyConnection
     ));
 
-builder.Configuration
-    .AddJsonFile(builder.Configuration["AdditionalConfig:Path"], optional: false, reloadOnChange: true);
+//builder.Configuration
+//    .AddJsonFile(builder.Configuration["AdditionalConfig:Path"], optional: false, reloadOnChange: true);
 
 // Load configuration
 builder.Services.Configure<IpRateLimitOptions>(
@@ -177,6 +177,7 @@ builder.Services.AddEvaluationServices(builder.Configuration);
 builder.Services.AddSingleton<IAppKnowledgeService, AppKnowledgeService>();
 builder.Services.AddScoped<ChatTools>();
 builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddScoped<ITeacherService, TeacherService>();
 
 var app = builder.Build();
 

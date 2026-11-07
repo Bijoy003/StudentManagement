@@ -66,12 +66,27 @@ namespace StudentManagement.Application.Services
 
         public async Task SaveCourse(Course course)
         {
+            // Defensive: never attach a caller-supplied enrollment graph to the write
+            // context (CourseController.Save binds the entity directly from the body).
+            course.Enrollments = new List<Enrollment>();
+
             if (course.Id == 0)
             {
+                // The legacy course UI never assigns teachers; ownership is stamped only
+                // through TeacherService.SaveCourseAsync, so any bound TeacherId is ignored.
+                course.TeacherId = null;
                 await _courseRepository.AddAsync(course);
             }
             else
             {
+                // Restamp the persisted owner so a crafted payload cannot strip or steal
+                // it. Read-only lookup keeps the write context free of a second tracked
+                // instance with the same key (Update would throw otherwise).
+                var persisted = await _courseRepository.GetByIdAsyncReadOnly(course.Id);
+                if (persisted != null)
+                {
+                    course.TeacherId = persisted.TeacherId;
+                }
                 _courseRepository.Update(course);
             }
             await _courseRepository.SaveChangesAsync();

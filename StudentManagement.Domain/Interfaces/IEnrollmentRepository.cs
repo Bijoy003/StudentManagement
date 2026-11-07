@@ -15,6 +15,7 @@ namespace StudentManagement.Domain.Interfaces
 
         Task<IEnumerable<Enrollment>> GetByCourseIdAsync(int courseId);
         Task<IEnumerable<Enrollment>> GetByCourseIdAsyncReadOnly(int courseId);
+        Task<List<Enrollment>> GetByCourseIdWithStudentAsyncReadOnly(int courseId);
 
         // Students enrolled in a specific course
         Task<List<Student>> GetStudentsByCourseAsync(int courseId);

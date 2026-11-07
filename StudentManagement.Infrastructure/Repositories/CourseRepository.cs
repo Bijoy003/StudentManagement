@@ -37,6 +37,15 @@ namespace StudentManagement.Infrastructure.Repositories
             return await _readOnlyDbContext.Courses.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
         }
 
+        public async Task<List<Course>> GetByTeacherIdAsyncReadOnly(string teacherId)
+        {
+            return await _readOnlyDbContext.Courses
+                .Where(c => c.TeacherId == teacherId)
+                .Include(c => c.Enrollments)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
         public async Task AddAsync(Course course)
         {
             await _dbContext.Courses.AddAsync(course);

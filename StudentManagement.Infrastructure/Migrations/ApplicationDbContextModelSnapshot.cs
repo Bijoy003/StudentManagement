@@ -168,6 +168,10 @@ namespace StudentManagement.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("TeacherId")
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
@@ -430,7 +434,7 @@ namespace StudentManagement.Migrations
             modelBuilder.Entity("StudentManagement.Domain.Entities.Enrollment", b =>
                 {
                     b.HasOne("StudentManagement.Domain.Entities.Course", "Course")
-                        .WithMany()
+                        .WithMany("Enrollments")
                         .HasForeignKey("CourseId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -444,6 +448,11 @@ namespace StudentManagement.Migrations
                     b.Navigation("Course");
 
                     b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("StudentManagement.Domain.Entities.Course", b =>
+                {
+                    b.Navigation("Enrollments");
                 });
 
             modelBuilder.Entity("StudentManagement.Domain.Entities.Student", b =>

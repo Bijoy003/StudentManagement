@@ -47,6 +47,12 @@
                         <li class="nav-item">
                             <a class="nav-link" href="@Url.Action("Index", "Chat")">Chat</a>
                         </li>
+                        @if (User.Identity.IsAuthenticated && User.IsInRole("Teacher"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" href="@Url.Action("Dashboard", "Teacher")">Teacher Dashboard</a>
+                            </li>
+                        }
                     </ul>
                 }
                 

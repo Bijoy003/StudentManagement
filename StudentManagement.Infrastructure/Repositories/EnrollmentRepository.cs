@@ -81,6 +81,15 @@ namespace StudentManagement.Infrastructure.Repositories
                              .ToListAsync();
         }
 
+        public async Task<List<Enrollment>> GetByCourseIdWithStudentAsyncReadOnly(int courseId)
+        {
+            return await _readOnlyDbContext.Enrollments
+                             .Where(e => e.CourseId == courseId)
+                             .Include(e => e.Student)
+                             .AsNoTracking()
+                             .ToListAsync();
+        }
+
         // Students enrolled in a specific course
         public async Task<List<Student>> GetStudentsByCourseAsync(int courseId)
         {

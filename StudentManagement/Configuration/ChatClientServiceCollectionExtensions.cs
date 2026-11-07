@@ -38,7 +38,9 @@ public static class ChatClientServiceCollectionExtensions
 
             return new ChatClient(
                 options.Model,
-                new ApiKeyCredential(options.ApiKey),
+                // Local/Ollama-style endpoints need no key, but ApiKeyCredential rejects
+                // empty strings; fall back to the same placeholder appsettings.json uses.
+                new ApiKeyCredential(string.IsNullOrWhiteSpace(options.ApiKey) ? "unused" : options.ApiKey),
                 clientOptions)
                 .AsIChatClient();
         })
@@ -63,7 +65,9 @@ public static class ChatClientServiceCollectionExtensions
 
             return new EmbeddingClient(
                 features.EmbeddingModel,
-                new ApiKeyCredential(chatOptions.ApiKey),
+                // Same placeholder fallback as the ChatClient above: an empty Chat:ApiKey
+                // must not throw at DI-resolution time (it 500s every /Chat request).
+                new ApiKeyCredential(string.IsNullOrWhiteSpace(chatOptions.ApiKey) ? "unused" : chatOptions.ApiKey),
                 clientOptions)
                 .AsIEmbeddingGenerator();
         });
