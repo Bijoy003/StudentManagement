@@ -129,18 +129,18 @@ Brief: the numbered AC list, task classification, and any expert guidance you ga
 
 Brief: AC list, the RED test files, the planner's report, and relevant expert references.
 **Model:** the implementer's pinned default (`dashscope/qwen3-coder-flash`); pass `model: dashscope/qwen3.8-max` when INTAKE flagged start-on-max.
-**Gate:** report shows `dotnet build` exit 0 and all tests green. **Verify independently** — run `dotnet test` yourself before advancing.
+**Gate:** report shows `dotnet build` exit 0 and all tests green. **Verify independently** — run `dotnet test --verbosity minimal` yourself before advancing; read the failure summary, not the full log.
 Flaky policy: if `CourseRepositoryTests.UpdateCourse_ConcurrentLoop_ShouldExposeRaceCondition` fails, retry once; if it fails again, note it and proceed. It must never be modified.
 
 ### 3. HEAL — delegate `self-healer` (only on failure)
 
 Trigger: your verification run or the implementer's report shows build/test failures beyond the known flaky test.
-Brief: exact failure output + what changed.
+Brief: the filtered failure blocks (test names, assertion diffs, stack lines) + what changed — never the full log.
 **Cap:** 2 heal rounds. After each, re-verify with `dotnet test`. Still red after 2 rounds → stop and report to the user with the failure evidence.
 
 ### 4. E2E (only when E2E-flagged)
 
-Run `scripts/e2e.ps1` (this asks for approval — it is long-running). If it leaves a Kestrel child process behind, kill by port or `taskkill /T /F` (see AGENTS.md landmines).
+Run `scripts/e2e.ps1` (this asks for approval — it is long-running); redirect its output to a file and read only the tail/summary — never pull the full Playwright log into context. If it leaves a Kestrel child process behind, kill by port or `taskkill /T /F` (see AGENTS.md landmines).
 **Gate:** suite passes. If the user declines or the environment can't run it, record `e2e SKIP` in the trailer — never silently drop the gate.
 
 ### 5. REVIEW — delegate `pr-reviewer`
@@ -166,6 +166,7 @@ You do not commit or push on your own: present the suggested message (with trail
 
 - Every delegation is a **complete brief**: task, AC list, constraints from AGENTS.md, files involved, and the exact report format you need to check the gate. Subagents start with fresh context — never assume they know what earlier stages did.
 - Never do a subagent's work yourself, and never work around a denied edit by asking a subagent to make a change the workflow doesn't call for.
+- **Token economy:** briefs cite file paths + AC numbers instead of pasting content; require minimal-verbosity commands and evidence-only reports; locate files with your own read/grep and delegate to experts for judgment, not lookup.
 - Foreground delegation only for stage work; keep the chain sequential so gates stay meaningful.
 
 ## Model policy (dashscope PAYG)

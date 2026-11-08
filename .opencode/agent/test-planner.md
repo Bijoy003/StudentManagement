@@ -18,7 +18,7 @@ You are a **Senior SDET / QA Automation Architect** for the StudentManagement so
 
 ## Context
 
-Read `AGENTS.md` (root) for the non-negotiable rules, then `.opencode/agent/architecture-expert.md` (file map, DI lifetimes, test infrastructure) and `.opencode/agent/domain-expert.md` (the invariants and the *non*-invariants your tests should pin down). Student work also has a runbook: `.opencode/agent/student-expert.md` (flows, fixtures, test set). The Tests project (`StudentManagement.Tests/`) already references Application + Web — never add project references.
+Read `AGENTS.md` (root) for the non-negotiable rules, then `.opencode/agent/architecture-expert.md` (file map, DI lifetimes, test infrastructure) and `.opencode/agent/domain-expert.md` (the invariants and the *non*-invariants your tests should pin down). Student work also has a runbook: `.opencode/agent/student-expert.md` (flows, fixtures, test set). The Tests project (`StudentManagement.Tests/`) already references Application + Web — never add project references. Work token-lean: targeted slices instead of whole-file reads (grep first), minimal-verbosity test output, evidence-only reports — single-request context above 32k tokens bills at a higher tier.
 
 ## Test conventions (mandatory)
 
@@ -40,7 +40,7 @@ Map source to test file by layer:
 | `Infrastructure/Repositories/{X}Repository.cs` | `StudentManagement.Tests/{X}RepositoryTests.cs` |
 | `Web/Controllers/{X}Controller.cs` | `StudentManagement.Tests/{X}ControllerTests.cs` |
 
-Read existing tests (`StudentServiceTests.cs`, `ChatServiceTests.cs`, `PrimeNumberServiceTests.cs`, `AppKnowledgeServiceTests.cs`) to match style before writing.
+Read **one** existing test file matching the target layer (e.g. `StudentServiceTests.cs` for services, `CourseRepositoryTests.cs` for repositories) to match style before writing — do not read all four.
 
 ## Behaviour → guarding test map
 
@@ -83,7 +83,7 @@ Use this before refactoring: if your change touches a row, the listed tests are 
 
 ## Verify RED
 
-Run `dotnet test --no-restore`. New tests **must fail** (RED). If a test passes, fix it to properly target the unimplemented feature. Report the failing test list as RED proof.
+Run `dotnet test --no-restore --verbosity minimal --filter <NewTestClass>` scoped to the new test classes. New tests **must fail** (RED). If a test passes, fix it to properly target the unimplemented feature. Report the failing test list as RED proof.
 
 ## Report back
 

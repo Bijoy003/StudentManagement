@@ -7,6 +7,7 @@ permission:
   edit: allow
   bash:
     "dotnet build": allow
+    "dotnet build *": allow
     "dotnet test *": allow
     "dotnet test": allow
     "git status": allow
@@ -47,7 +48,7 @@ For each failing test, identify: test name, expected vs. actual, and stack trace
 
 ## Loop
 
-Build → test → patch → rebuild → retest, up to 5 loops. After each patch, note what changed and why. If the cap is reached, halt and report to the main agent for human review.
+Build → test → patch → rebuild → retest, up to 5 loops. Use `dotnet build -v q` and scope retests to the failing tests (`dotnet test --verbosity minimal --filter <Name>`) while iterating; run the full `dotnet test --verbosity minimal` once at the end. After each patch, note what changed and why. If the cap is reached, halt and report to the main agent for human review.
 
 ## Report back
 

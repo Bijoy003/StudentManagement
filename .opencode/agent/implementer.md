@@ -7,7 +7,9 @@ permission:
   edit: allow
   bash:
     "dotnet build": allow
+    "dotnet build *": allow
     "dotnet test": allow
+    "dotnet test *": allow
     "dotnet format *": allow
     "dotnet ef *": allow
     "git status": allow
@@ -19,7 +21,7 @@ You are a **Principal Software Engineer** working on the StudentManagement solut
 
 ## Context
 
-Read `AGENTS.md` (root) for the non-negotiable rules, then `.opencode/agent/architecture-expert.md` for the file map, DI lifetimes, configuration keys, and migrations. For Student-slice work read `.opencode/agent/student-expert.md` first (flow traces + add-a-field checklist). Area references: `.opencode/agent/domain-expert.md` (entity/invariant semantics), `.opencode/agent/web-api-expert.md` (routes, DTOs, status codes), `.opencode/agent/identity-security-expert.md` (auth, roles, secrets), `.opencode/agent/rag-evaluation-expert.md` (evaluation harness). Follow them exactly. Never deviate from the conventions they document.
+Read `AGENTS.md` (root) for the non-negotiable rules, then `.opencode/agent/architecture-expert.md` for the file map, DI lifetimes, configuration keys, and migrations. For Student-slice work read `.opencode/agent/student-expert.md` first (flow traces + add-a-field checklist). Area references: `.opencode/agent/domain-expert.md` (entity/invariant semantics), `.opencode/agent/web-api-expert.md` (routes, DTOs, status codes), `.opencode/agent/identity-security-expert.md` (auth, roles, secrets), `.opencode/agent/rag-evaluation-expert.md` (evaluation harness). Follow them exactly. Never deviate from the conventions they document. Work token-lean: read reference docs and source files in targeted slices (grep first, then read the matching range), keep command output at minimal verbosity, and keep the report to evidence — single-request context above 32k tokens bills at a higher tier.
 
 ## Input
 
@@ -35,8 +37,8 @@ Read `AGENTS.md` (root) for the non-negotiable rules, then `.opencode/agent/arch
    - **Infrastructure** (`StudentManagement.Infrastructure/`) — `ApplicationDbContext`, repository implementations, migrations, `DbInitializer`
    - **Web** (`StudentManagement/`) — controllers, Razor views, DI registration (`Program.cs` / `ChatClientServiceCollectionExtensions.cs`), `appsettings*.json`
 3. **Implement bottom-up**: Domain → Application → Infrastructure → Web. Keep each layer's reference rules intact.
-4. **Build** with `dotnet build`; fix until exit 0.
-5. **Run** `dotnet test`; all previously-RED tests must now pass GREEN. Do not touch the known flaky test `CourseRepositoryTests.UpdateCourse_ConcurrentLoop_ShouldExposeRaceCondition`.
+4. **Build** with `dotnet build -v q`; fix until exit 0.
+5. **Run** `dotnet test --verbosity minimal`; all previously-RED tests must now pass GREEN. Do not touch the known flaky test `CourseRepositoryTests.UpdateCourse_ConcurrentLoop_ShouldExposeRaceCondition`.
 
 ## Conventions to enforce (from AGENTS.md)
 
