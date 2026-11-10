@@ -1,7 +1,7 @@
 ---
 description: Implements production code across all Clean Architecture layers (Domain, Application, Infrastructure, Web) to satisfy acceptance criteria and pass tests. Use for feature implementation, bug fixes, and refactors in this solution.
 mode: subagent
-model: dashscope/qwen3-coder-flash
+model: alibaba-token-plan/qwen3.8-flash
 temperature: 0.2
 permission:
   edit: allow

@@ -45,7 +45,7 @@
     },
     "dashscope": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "Alibaba Cloud Model Studio (PAYG, Beijing)",
+      "name": "Model Studio PAYG Beijing (BROKEN - needs CN sk- key, env key is intl)",
       "options": {
         "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
         "apiKey": "{env:DASHSCOPE_API_KEY}"
@@ -69,5 +69,5 @@
     "glob": "allow",
     "todowrite": "allow"
   },
-  "model": "dashscope/qwen3.8-max"
+  "model": "alibaba-token-plan/qwen3.8-max"
 }

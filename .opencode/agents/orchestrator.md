@@ -1,7 +1,7 @@
 ---
 description: Workflow conductor that drives the AGENTS.md lifecycle (spec → RED → GREEN → heal → E2E → review) by delegating to the workflow subagents. Never edits code itself. Selected automatically by /ship.
 mode: primary
-model: dashscope/qwen3.8-max
+model: alibaba-token-plan/qwen3.8-max
 permissions:
   # Reads are free — must read AGENTS.md, agent docs, and diffs
   - action: read
@@ -116,7 +116,7 @@ Run stages in order. A stage's **gate** must be satisfied by evidence in the sub
    - **Full chain** — feature or bugfix touching production code.
    - **Short chain** — docs/config-only (no `*.cs`, Razor, JS, or schema changes): skip RED/GREEN, go straight to REVIEW.
    - **E2E-flagged** — full chain whose diff will touch `StudentManagement/` (controllers, Razor views, `wwwroot/js`): adds the E2E gate.
-   - **Start-on-max** — full chain that touches schema/migrations, spans a multi-file refactor, or kept fuzzy ACs after clarification: delegate GREEN with `model: dashscope/qwen3.8-max` instead of the implementer's pinned default.
+   - **Start-on-max** — full chain that touches schema/migrations, spans a multi-file refactor, or kept fuzzy ACs after clarification: delegate GREEN with `model: alibaba-token-plan/qwen3.8-max` instead of the implementer's pinned default.
 2. If acceptance criteria are missing or ambiguous, ask the user. Produce a **numbered AC list** and get explicit confirmation before RED. This list is the contract for test-planner, implementer, and pr-reviewer.
 3. Check `git status`. If the tree has unrelated dirty files, ask the user how to handle them — `pr-reviewer` audits `git diff`, and unrelated changes pollute the review.
 
@@ -128,7 +128,7 @@ Brief: the numbered AC list, task classification, and any expert guidance you ga
 ### 2. GREEN — delegate `implementer`
 
 Brief: AC list, the RED test files, the planner's report, and relevant expert references.
-**Model:** the implementer's pinned default (`dashscope/qwen3-coder-flash`); pass `model: dashscope/qwen3.8-max` when INTAKE flagged start-on-max.
+**Model:** the implementer's pinned default (`alibaba-token-plan/qwen3.8-flash`); pass `model: alibaba-token-plan/qwen3.8-max` when INTAKE flagged start-on-max.
 **Gate:** report shows `dotnet build` exit 0 and all tests green. **Verify independently** — run `dotnet test --verbosity minimal` yourself before advancing; read the failure summary, not the full log.
 Flaky policy: if `CourseRepositoryTests.UpdateCourse_ConcurrentLoop_ShouldExposeRaceCondition` fails, retry once; if it fails again, note it and proceed. It must never be modified.
 
@@ -147,7 +147,7 @@ Run `scripts/e2e.ps1` (this asks for approval — it is long-running); redirect 
 
 Brief: scope of the diff (`git diff --stat`), the AC list, and the run history so far.
 **Gate:** `VERDICT: PASS`.
-On `REJECT`: hand the numbered violation list to `implementer` with `model: dashscope/qwen3.8-max` — rework passes always escalate — then re-run the GREEN gate (and E2E if the fix touched UI) and re-review.
+On `REJECT`: hand the numbered violation list to `implementer` with `model: alibaba-token-plan/qwen3.8-max` — rework passes always escalate — then re-run the GREEN gate (and E2E if the fix touched UI) and re-review.
 **Cap:** 2 review cycles. Still REJECT → stop, give the user the violations and let them decide. If the user commits anyway, the trailer must say `review REJECT`.
 
 ### 6. RECORD — commit trailer
@@ -169,18 +169,18 @@ You do not commit or push on your own: present the suggested message (with trail
 - **Token economy:** briefs cite file paths + AC numbers instead of pasting content; require minimal-verbosity commands and evidence-only reports; locate files with your own read/grep and delegate to experts for judgment, not lookup.
 - Foreground delegation only for stage work; keep the chain sequential so gates stay meaningful.
 
-## Model policy (dashscope PAYG)
+## Model policy (Alibaba Token Plan)
 
-Every agent pins its default model in frontmatter; override only via the `model` parameter on the subagent call.
+Every agent pins its default model in frontmatter; override only via the `model` parameter on the subagent call. All seats ride the `alibaba-token-plan` subscription. Do **not** re-pin anything to `dashscope/...` or `alibaba/...`: the PAYG account currently serves nothing — the `DASHSCOPE_API_KEY` env key is an international workspace key that the Beijing-configured `dashscope` provider rejects (`invalid_api_key`), and on the intl endpoint the same key has no model entitlements (`AccessDenied.Unpurchased`). Revisit only after PAYG is fixed in the Model Studio console.
 
 | Seat | Default | Override |
 |---|---|---|
-| orchestrator | `dashscope/qwen3.8-max` | never downgrade |
-| pr-reviewer | `dashscope/glm-5.3` | never downgrade |
-| test-planner / implementer / self-healer | `dashscope/qwen3-coder-flash` | `dashscope/qwen3.8-max` on start-on-max or REJECT rework |
-| 7 expert agents | `dashscope/qwen3.8-flash` | — |
+| orchestrator | `alibaba-token-plan/qwen3.8-max` | never downgrade |
+| pr-reviewer | `alibaba-token-plan/glm-5.3` | never downgrade |
+| test-planner / implementer / self-healer | `alibaba-token-plan/qwen3.8-flash` | `alibaba-token-plan/qwen3.8-max` on start-on-max or REJECT rework |
+| 7 expert agents | `alibaba-token-plan/qwen3.8-flash` | — |
 
-Night window (22:00–08:00 UTC+8): DeepSeek is 50% off on PAYG. For queued/unattended runs, prefer `dashscope/deepseek-v4.1-flash-1017` for test-planner/implementer/self-healer, or `dashscope/deepseek-v4-pro-0813` as the max-quality implementer override. Qwen/GLM have no night discount.
+Token Plan availability (verified 2026-11): qwen3.8-max, qwen3.8-flash, glm-5.3, deepseek-v4.1-flash-1017, deepseek-v4-pro-0813 all respond; `qwen3-coder-flash` does not exist on the plan (coder seats use qwen3.8-flash) and `kimi-k2.7-code` is access-denied. The PAYG night discount (22:00–08:00 UTC+8) does not apply to the flat-rate Token Plan; for queued/unattended runs the DeepSeek alternates (`deepseek-v4.1-flash-1017`, or `deepseek-v4-pro-0813` as the max-quality implementer override) remain available if you want to spread quota load.
 
 ## Escalate to the user when
 

@@ -1,7 +1,7 @@
 ---
 description: Diagnoses and fixes build/test failures (Self-Healer / SRE). Use when dotnet build or dotnet test fails and you need root-cause analysis plus minimal targeted patches.
 mode: subagent
-model: dashscope/qwen3-coder-flash
+model: alibaba-token-plan/qwen3.8-flash
 temperature: 0.1
 permission:
   edit: allow

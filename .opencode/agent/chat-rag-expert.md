@@ -1,7 +1,7 @@
 ---
 description: Specialist for the AI chat / RAG subsystem (ChatService, ChatTools, AppKnowledgeService, SemanticChunker, document parsers, ChromaDB, MCP, Ollama config). Use for any work touching AI chat, embeddings, RAG knowledge, or MCP.
 mode: subagent
-model: dashscope/qwen3.8-flash
+model: alibaba-token-plan/qwen3.8-flash
 temperature: 0.2
 permission:
   edit: allow
