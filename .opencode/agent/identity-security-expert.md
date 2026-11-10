@@ -1,7 +1,7 @@
 ---
 description: Identity and security reference for StudentManagement — cookie + Google authentication, TOTP MFA, password reset, role matrix, rate limiting, anti-forgery posture, and the known security gaps (committed secrets, state-changing GETs, stubbed email). Use when touching Account/Admin code, adding an endpoint that needs authz, or auditing a change for security.
 mode: subagent
-model: dashscope/qwen3.8-flash
+model: alibaba-token-plan/qwen3.8-flash
 temperature: 0.1
 permission:
   edit: deny
@@ -60,9 +60,10 @@ is true; it generates a reset token and calls `MailgunEmailService.SendEmailAsyn
 with 400, POST calls `ResetPasswordAsync` and shows Identity's errors. `/Account/Logout` is POST-only
 (no anti-forgery attribute).
 
-> **Critical:** `MailgunEmailService.SendEmailAsync` begins with `return;` — **no email is ever sent**, so the
-> reset link never reaches the user. `SendMfaCodeHtmlAsync` (also unused) has the same stub underneath.
-> Any "working" password-reset flow must be tested by reading the token, not the mailbox.
+> **Critical:** `MailgunEmailService.SendEmailAsync` is gated on `Mailgun:Enabled` (default `false` in the
+> committed config) — it logs and skips without any HTTP call, so the reset link never reaches the user
+> unless the flag is set via user-secrets/env (`Mailgun__Enabled=true`). `SendMfaCodeHtmlAsync` (also unused)
+> shares the same gate. Any "working" password-reset flow must be tested by reading the token, not the mailbox.
 
 ## Authorization matrix (what is actually enforced)
 
@@ -91,9 +92,10 @@ IP-based (`X-Real-IP` respected, `X-ClientId` supported), endpoint rules: `*` 20
 1. **Secrets committed**: Google `ClientSecret`, OpenRouter API key and Jira API token in
    `appsettings.Development.json`, DB connection string fragments in `appsettings*.json`, seeded admin password
    in code. Do not add more; prefer env vars / user-secrets; flag rotation when touching these files.
-2. **No anti-forgery on the JSON POST endpoints** — `[ValidateAntiForgeryToken]` is commented out on
-   `StudentController.SaveStudent`; `CourseController.Save` and `EnrollmentController.Save` have none. They are
-   cookie-authenticated and JSON-only (no CORS policy configured), so CSRF exposure is limited but real.
+2. **Anti-forgery only partial on the JSON POST endpoints** — `StudentController.SaveStudent` now enforces
+   `[ValidateAntiForgeryToken]` (`student.js` sends the `RequestVerificationToken` header scraped from the
+   layout's logout-form hidden input); `CourseController.Save` and `EnrollmentController.Save` still have none.
+   They are cookie-authenticated and JSON-only (no CORS policy configured), so CSRF exposure is limited but real.
 3. **State-changing GETs**: `Student/DeleteStudent`, `Course/Delete`, `Enrollment/Delete` mutate data on GET.
 4. **Over-permissive MVC authorization** (see matrix) — the docs claim role-based access that the code lacks.
 5. **`AdditionalConfig:Path`** loads an external, required JSON file (`C:\inetpub\appsettings.json`) at startup;

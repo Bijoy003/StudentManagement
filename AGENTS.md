@@ -64,7 +64,7 @@ Prefer `/ship <task>`: the `orchestrator` primary agent (`.opencode/agents/orche
 ## Landmines
 
 - **`AdditionalConfig:Path` is required** (`optional: false`) — `Program.cs` loads `C:\inetpub\appsettings.json` and throws on startup when missing; override with `AdditionalConfig__Path` (E2E uses `scripts/appsettings.e2e.json`). `docker-compose.yml` does **not** set it, so the web container only starts if that file is baked into the image.
-- **`MailgunEmailService.SendEmailAsync` returns immediately** (`return;` on line 1) — forgot-password never sends mail.
-- **No antiforgery token on JSON POST actions** (`[ValidateAntiForgeryToken]` is commented out in `StudentController.SaveStudent`); admin/account forms do use it.
+- **Mailgun sends only when `Mailgun:Enabled=true`** — committed config defaults to `false`, so `SendEmailAsync` logs and skips without any HTTP call; set it via user-secrets/env (`Mailgun__Enabled`) to actually send. Forgot-password delivers no mail by default — test by reading the reset token, not the mailbox.
+- **`StudentController.SaveStudent` enforces `[ValidateAntiForgeryToken]`** — `wwwroot/js/student.js` sends the token via the `RequestVerificationToken` header, scraped from the layout's logout-form hidden input (sturdier meta-tag/endpoint source is a deferred follow-up). `CourseController.Save` and `EnrollmentController.Save` JSON POSTs still carry no token; admin/account forms do use it.
 - **Deleting a student or course cascades its enrollments**; `IArchiveService` is registered but called by nothing.
 - **`dotnet run` spawns a child Kestrel process** — kill with `taskkill /T /F` or by port, or the next run hits "address already in use".

@@ -13,8 +13,8 @@ Status legend: ✅ done · ⚠️ partial · ❌ not started
 - [ ] Query Optimization Techniques — ⚠️ near-done: all reads via `ReadOnlyDbContext` + `AsNoTracking()`, eager `Include` in repositories, FK indexes, cache offload; missing pagination (`Skip`/`Take`)
 
 ## Software Design
-- [ ] Design Patterns - Behavioral Patterns — ❌ none in code; branch `origin/feature/software-design-pattern` exists but is empty (same commit as develop)
-- [ ] Anti Patterns — ❌ not studied; some present to fix: `MailgunEmailService` stub (unreachable code), commented-out antiforgery on JSON POSTs, commented-out code blocks
+- [x] Design Patterns - Behavioral Patterns — ✅ 4 patterns implemented + tested (Strategy=grading, Observer=domain events, Template Method=parser base, Chain of Responsibility=student validation) with `docs/behavioral-patterns.md`; branch `feature/software-design-pattern`
+- [x] Anti Patterns — ✅ top-3 fixed (Mailgun dead stub → `Mailgun:Enabled` gate, antiforgery re-enabled on `SaveStudent` JSON POST, magic cache keys → `CacheKeys`); rest catalogued in `docs/anti-patterns.md`
 
 ## Operating System
 - [ ] Basic/Advanced Shell Scripting — ⚠️ solid PowerShell now in `scripts/` (`e2e.ps1` container lifecycle, `demo-cache.ps1`, `codegen.ps1`); no bash/Linux scripting
