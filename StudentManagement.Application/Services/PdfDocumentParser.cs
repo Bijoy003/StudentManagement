@@ -1,14 +1,13 @@
 using UglyToad.PdfPig;
-using UglyToad.PdfPig.Content;
 
 namespace StudentManagement.Application.Services;
 
-public class PdfDocumentParser : IDocumentParser
+public class PdfDocumentParser : DocumentParserBase
 {
-    public bool CanParse(string fileName) =>
+    public override bool CanParse(string fileName) =>
         fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
 
-    public Task<string> ExtractTextAsync(Stream stream)
+    protected override string ExtractText(Stream stream)
     {
         using var pdf = PdfDocument.Open(stream);
         var text = new System.Text.StringBuilder();
@@ -22,6 +21,6 @@ public class PdfDocumentParser : IDocumentParser
             text.AppendLine();
         }
 
-        return Task.FromResult(text.ToString());
+        return text.ToString();
     }
 }

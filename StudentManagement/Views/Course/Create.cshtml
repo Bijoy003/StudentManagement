@@ -12,6 +12,7 @@
 }
 
 <form class="p-3 mt-2" id="course-form" onsubmit="saveCourse(event)">
+    <input type="hidden" asp-for="Id" />
     <div class="mb-3">
         <label asp-for="Name" class="form-label">Course Name</label>
         <input class="form-control" asp-for="Name" id="name" />
@@ -19,6 +20,11 @@
     <div class="mb-3">
         <label asp-for="Credits" class="form-label">Credits</label>
         <input type="number" class="form-control" asp-for="Credits" id="credits" />
+    </div>
+    <div class="mb-3">
+        <label asp-for="GradeMode" class="form-label">Grading Mode</label>
+        <select class="form-select" asp-for="GradeMode" id="grade-mode"
+                asp-items="@Html.GetEnumSelectList<GradeMode>()"></select>
     </div>
     <button type="submit" class="btn btn-outline-success">Save</button>
     <a class="btn btn-outline-danger" href="@Url.Action("Index", "Course")">Cancel</a>

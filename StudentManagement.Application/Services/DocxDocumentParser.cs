@@ -2,12 +2,12 @@ using NPOI.XWPF.UserModel;
 
 namespace StudentManagement.Application.Services;
 
-public class DocxDocumentParser : IDocumentParser
+public class DocxDocumentParser : DocumentParserBase
 {
-    public bool CanParse(string fileName) =>
+    public override bool CanParse(string fileName) =>
         fileName.EndsWith(".docx", StringComparison.OrdinalIgnoreCase);
 
-    public Task<string> ExtractTextAsync(Stream stream)
+    protected override string ExtractText(Stream stream)
     {
         using var doc = new XWPFDocument(stream);
         var text = new System.Text.StringBuilder();
@@ -37,6 +37,6 @@ public class DocxDocumentParser : IDocumentParser
             }
         }
 
-        return Task.FromResult(text.ToString());
+        return text.ToString();
     }
 }

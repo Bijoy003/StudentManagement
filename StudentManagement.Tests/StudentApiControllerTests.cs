@@ -10,6 +10,7 @@ using StudentManagement.Application.DTOs.Students;
 using StudentManagement.Application.Interfaces;
 using StudentManagement.Domain.Entities;
 using StudentManagement.Web.Controllers;
+using System.ComponentModel.DataAnnotations;
 
 namespace StudentManagement.Tests;
 
@@ -288,6 +289,31 @@ public class StudentApiControllerTests
     }
 
     [Fact]
+    public async Task CreateStudent_ServiceThrowsValidationException_Returns400ValidationProblemDetails()
+    {
+        // Arrange — the Chain-of-Responsibility inside StudentService rejects the student
+        var mock = CreateServiceMock();
+        mock.Setup(s => s.SaveStudentAsync(It.IsAny<Student>()))
+            .ThrowsAsync(new ValidationException("Name is required."));
+
+        var controller = CreateController(mock);
+
+        // Act
+        var result = await controller.CreateStudent(new StudentRequest
+        {
+            Name = "",
+            Email = "ada@example.com"
+        });
+
+        // Assert — declared 400 contract: ValidationProblemDetails carrying ex.Message
+        var badRequest = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(400, badRequest.StatusCode);
+        var problem = Assert.IsType<ValidationProblemDetails>(badRequest.Value);
+        Assert.Equal("Name is required.", problem.Detail);
+        Assert.Contains("Name is required.", problem.Errors[string.Empty]);
+    }
+
+    [Fact]
     public async Task UpdateStudent_ExistingId_ReplacesFieldsAndReturns204()
     {
         // Arrange
@@ -344,6 +370,33 @@ public class StudentApiControllerTests
     }
 
     [Fact]
+    public async Task UpdateStudent_ServiceThrowsValidationException_Returns400ValidationProblemDetails()
+    {
+        // Arrange — the loaded student fails the validation chain on save
+        var existing = new Student { Id = 5, Name = "Old Name", Email = "old@example.com" };
+        var mock = CreateServiceMock();
+        mock.Setup(s => s.GetStudentByIdAsync(5)).ReturnsAsync(existing);
+        mock.Setup(s => s.SaveStudentAsync(It.IsAny<Student>()))
+            .ThrowsAsync(new ValidationException("Email format is invalid."));
+
+        var controller = CreateController(mock);
+
+        // Act
+        var result = await controller.UpdateStudent(5, new StudentRequest
+        {
+            Name = "New Name",
+            Email = "nope"
+        });
+
+        // Assert
+        var badRequest = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, badRequest.StatusCode);
+        var problem = Assert.IsType<ValidationProblemDetails>(badRequest.Value);
+        Assert.Equal("Email format is invalid.", problem.Detail);
+        Assert.Contains("Email format is invalid.", problem.Errors[string.Empty]);
+    }
+
+    [Fact]
     public async Task PatchStudent_PartialPayload_UpdatesOnlyProvidedFields()
     {
         // Arrange
@@ -391,6 +444,29 @@ public class StudentApiControllerTests
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(404, problem.StatusCode);
         mock.Verify(s => s.SaveStudentAsync(It.IsAny<Student>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PatchStudent_ServiceThrowsValidationException_Returns400ValidationProblemDetails()
+    {
+        // Arrange — merge-patch surfaces chain failures through the same 400 contract
+        var existing = new Student { Id = 5, Name = "Old Name", Email = "old@example.com" };
+        var mock = CreateServiceMock();
+        mock.Setup(s => s.GetStudentByIdAsync(5)).ReturnsAsync(existing);
+        mock.Setup(s => s.SaveStudentAsync(It.IsAny<Student>()))
+            .ThrowsAsync(new ValidationException("Email format is invalid."));
+
+        var controller = CreateController(mock);
+
+        // Act
+        var result = await controller.PatchStudent(5, new StudentPatchRequest { Email = "nope" });
+
+        // Assert
+        var badRequest = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(400, badRequest.StatusCode);
+        var problem = Assert.IsType<ValidationProblemDetails>(badRequest.Value);
+        Assert.Equal("Email format is invalid.", problem.Detail);
+        Assert.Contains("Email format is invalid.", problem.Errors[string.Empty]);
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace StudentManagement.Web.Controllers
 {
@@ -37,7 +38,7 @@ namespace StudentManagement.Web.Controllers
         }
 
         [HttpPost]
-        //[ValidateAntiForgeryToken]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> SaveStudent([FromBody] Student student)
         {
             try
@@ -53,6 +54,13 @@ namespace StudentManagement.Web.Controllers
                 }
                 await _studentService.SaveStudentAsync(student);
                 return Ok(true);
+            }
+            catch (ValidationException ex)
+            {
+                // Chain-of-Responsibility validation failure (StudentService) is a client
+                // error: same 400 { Message } shape as the ModelState branch above.
+                _logger.LogWarning(ex, "Validation failed while saving student: {StudentName}", student?.Name);
+                return BadRequest(new { Message = ex.Message });
             }
             catch (Exception ex)
             {

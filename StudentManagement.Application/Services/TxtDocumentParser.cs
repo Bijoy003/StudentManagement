@@ -1,14 +1,14 @@
 namespace StudentManagement.Application.Services;
 
-public class TxtDocumentParser : IDocumentParser
+public class TxtDocumentParser : DocumentParserBase
 {
-    public bool CanParse(string fileName) =>
+    public override bool CanParse(string fileName) =>
         fileName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) ||
         fileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase);
 
-    public Task<string> ExtractTextAsync(Stream stream)
+    protected override string ExtractText(Stream stream)
     {
         using var reader = new StreamReader(stream);
-        return reader.ReadToEndAsync();
+        return reader.ReadToEnd();
     }
 }

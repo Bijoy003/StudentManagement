@@ -1,6 +1,8 @@
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using StudentManagement.Application.DTOs.Common;
 using StudentManagement.Application.DTOs.Students;
 using StudentManagement.Domain.Entities;
@@ -109,6 +111,13 @@ public sealed class StudentApiController : ControllerBase
             var dto = student.ToDto();
             return CreatedAtRoute("ApiGetStudentById", new { id = dto.Id }, dto);
         }
+        catch (ValidationException ex)
+        {
+            // Chain-of-Responsibility validation failure (StudentService): declared 400
+            // contract, ValidationProblemDetails carrying the failing rule's message.
+            _logger.LogWarning(ex, "Validation failed while creating student {StudentName}", request.Name);
+            return ValidationError(ex.Message);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error while creating student {StudentName}", request.Name);
@@ -136,6 +145,11 @@ public sealed class StudentApiController : ControllerBase
             await _studentService.SaveStudentAsync(student);
 
             return NoContent();
+        }
+        catch (ValidationException ex)
+        {
+            _logger.LogWarning(ex, "Validation failed while updating student {StudentId}", id);
+            return ValidationError(ex.Message);
         }
         catch (Exception ex)
         {
@@ -166,6 +180,11 @@ public sealed class StudentApiController : ControllerBase
             await _studentService.SaveStudentAsync(student);
 
             return NoContent();
+        }
+        catch (ValidationException ex)
+        {
+            _logger.LogWarning(ex, "Validation failed while patching student {StudentId}", id);
+            return ValidationError(ex.Message);
         }
         catch (Exception ex)
         {
@@ -205,6 +224,25 @@ public sealed class StudentApiController : ControllerBase
             statusCode: StatusCodes.Status404NotFound,
             title: "Student not found",
             detail: $"No student with id {id} exists.");
+
+    // 400 matching the [ProducesResponseType(typeof(ValidationProblemDetails), 400)]
+    // contract of the write actions: message exposed as Detail AND as Errors[""].
+    private ObjectResult ValidationError(string message)
+    {
+        var modelState = new ModelStateDictionary();
+        modelState.AddModelError(string.Empty, message);
+
+        return new ObjectResult(new ValidationProblemDetails(modelState)
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Title = "Validation failed",
+            Detail = message
+        })
+        {
+            StatusCode = StatusCodes.Status400BadRequest,
+            DeclaredType = typeof(ValidationProblemDetails)
+        };
+    }
 
     private ObjectResult UnexpectedError(string detail) =>
         Problem(

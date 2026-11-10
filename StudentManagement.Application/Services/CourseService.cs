@@ -23,7 +23,7 @@ namespace StudentManagement.Application.Services
 
         public async Task<IEnumerable<Course>> GetAllCourses()
         {
-            const string cacheKey = "courses_all";
+            const string cacheKey = CacheKeys.AllCourses;
             var cachedData = await _cache.GetStringAsync(cacheKey);
             if (!string.IsNullOrEmpty(cachedData))
             {
@@ -43,7 +43,7 @@ namespace StudentManagement.Application.Services
 
         public async Task<Course?> GetCourseById(int id)
         {
-            var cacheKey = $"course_{id}";
+            var cacheKey = CacheKeys.Course(id);
             var cachedData = await _cache.GetStringAsync(cacheKey);
             if (!string.IsNullOrEmpty(cachedData))
             {
@@ -102,11 +102,11 @@ namespace StudentManagement.Application.Services
 
         private async Task InvalidateCacheAsync(int? courseId = null)
         {
-            await RemoveAsync("courses_all");
-            await RemoveAsync("course_student_counts");
+            await RemoveAsync(CacheKeys.AllCourses);
+            await RemoveAsync(CacheKeys.CourseStudentCounts);
             if (courseId.HasValue)
             {
-                await RemoveAsync($"course_{courseId.Value}");
+                await RemoveAsync(CacheKeys.Course(courseId.Value));
             }
         }
 
@@ -118,7 +118,7 @@ namespace StudentManagement.Application.Services
 
         public async Task<List<CourseStudentCountDto>> GetStudentCountPerCourse()
         {
-            const string cacheKey = "course_student_counts";
+            const string cacheKey = CacheKeys.CourseStudentCounts;
             var cachedData = await _cache.GetStringAsync(cacheKey);
             if (!string.IsNullOrEmpty(cachedData))
             {

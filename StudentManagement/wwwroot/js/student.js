@@ -178,12 +178,20 @@ let ajaxGetAsync = async (url, data) => {
     });
 }
 
+// The layout's logout form renders the antiforgery hidden input on every authenticated
+// page; [ValidateAntiForgeryToken] on JSON POSTs accepts it via the standard
+// RequestVerificationToken header.
+function getAntiForgeryToken() {
+    return $('input[name="__RequestVerificationToken"]').first().val() || '';
+}
+
 let ajaxPostAsync = async (url, data) => {
     return await $.ajax({
         type: 'POST',
         url: `${url}`,
         dataType: 'json',
         contentType: "application/json; charset=utf-8",
+        headers: { 'RequestVerificationToken': getAntiForgeryToken() },
         data: JSON.stringify(data),
         success: function (response) {
             return response;

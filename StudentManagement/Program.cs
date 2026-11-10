@@ -4,8 +4,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.OpenApi.Models;
+using StudentManagement.Application;
 using StudentManagement.Application.Interfaces;
 using StudentManagement.Application.Evaluation;
+using StudentManagement.Application.Validation;
 using StudentManagement.Commands;
 using StudentManagement.Configuration;
 using StudentManagement.Application.Services;
@@ -169,6 +171,25 @@ builder.Services.AddScoped<ICourseService, CourseService>();
 builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IPrimeNumberService, PrimeNumberService>();
 builder.Services.AddScoped<IArchiveService, ArchiveService>();
+
+// In-process domain events (observer): dispatcher + assembly-scanned handler registration.
+builder.Services.AddDomainEvents(typeof(DomainEventDispatcher).Assembly);
+
+// Grading strategies (one per GradeMode); EnrollmentService resolves per course.
+builder.Services.AddScoped<IGradingStrategy, LetterGradeStrategy>();
+builder.Services.AddScoped<IGradingStrategy, PassFailStrategy>();
+builder.Services.AddScoped<IGradingStrategy, GpaStrategy>();
+
+// Student validation chain (Chain of Responsibility), consumed by StudentService.
+builder.Services.AddScoped<IValidationHandler>(sp =>
+{
+    var requiredFields = new RequiredFieldsRule();
+    var emailFormat = new EmailFormatRule();
+    var duplicateEmail = new DuplicateEmailRule(sp.GetRequiredService<IStudentRepository>());
+    requiredFields.SetNext(emailFormat);
+    emailFormat.SetNext(duplicateEmail);
+    return requiredFields;
+});
 
 builder.Services.AddAppChatClient(builder.Configuration);
 

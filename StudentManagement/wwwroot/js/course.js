@@ -4,7 +4,8 @@
     var course = {
         Id: $('#Id').val() || 0,
         Name: $('#name').val(),
-        Credits: $('#credits').val()
+        Credits: $('#credits').val(),
+        GradeMode: parseInt($('#grade-mode').val(), 10) || 0
     };
 
     $.ajax({

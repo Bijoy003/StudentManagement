@@ -2,13 +2,13 @@ using NPOI.SS.UserModel;
 
 namespace StudentManagement.Application.Services;
 
-public class ExcelDocumentParser : IDocumentParser
+public class ExcelDocumentParser : DocumentParserBase
 {
-    public bool CanParse(string fileName) =>
+    public override bool CanParse(string fileName) =>
         fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ||
         fileName.EndsWith(".xls", StringComparison.OrdinalIgnoreCase);
 
-    public Task<string> ExtractTextAsync(Stream stream)
+    protected override string ExtractText(Stream stream)
     {
         using var workbook = WorkbookFactory.Create(stream);
         var text = new System.Text.StringBuilder();
@@ -39,6 +39,6 @@ public class ExcelDocumentParser : IDocumentParser
             }
         }
 
-        return Task.FromResult(text.ToString());
+        return text.ToString();
     }
 }

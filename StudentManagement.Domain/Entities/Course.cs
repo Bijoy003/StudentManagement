@@ -13,6 +13,8 @@ namespace StudentManagement.Domain.Entities
 
         public int Credits { get; set; }
 
+        public GradeMode GradeMode { get; set; } = GradeMode.Letter;
+
         public string? TeacherId { get; set; }
 
         // Reverse navigation: excluded from System.Text.Json so serializing an Enrollment

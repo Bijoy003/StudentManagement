@@ -1,8 +1,10 @@
 ﻿using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using StudentManagement.Application.Interfaces;
+using StudentManagement.Application.Validation;
 using StudentManagement.Domain.Entities;
 using StudentManagement.Domain.Interfaces;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 
 namespace StudentManagement.Application.Services
@@ -14,21 +16,28 @@ namespace StudentManagement.Application.Services
         private readonly IDistributedCache _cache;
         private readonly ILogger<StudentService> _logger;
 
+        // Head of the Chain of Responsibility validation pipeline
+        // (RequiredFieldsRule -> EmailFormatRule -> DuplicateEmailRule). Optional so the
+        // legacy 4-arg construction (existing tests + DI fallback) keeps saving unvalidated.
+        private readonly IValidationHandler? _validationChain;
+
         public StudentService(
             IStudentRepository studentRepository,
             IEnrollmentRepository enrollmentRepository,
             IDistributedCache cache,
-            ILogger<StudentService> logger)
+            ILogger<StudentService> logger,
+            IValidationHandler? validationChain = null)
         {
             _studentRepository = studentRepository;
             _enrollmentRepository = enrollmentRepository;
             _cache = cache;
             _logger = logger;
+            _validationChain = validationChain;
         }
 
         public async Task<IEnumerable<Student>> GetStudentsAsync()
         {
-            const string cacheKey = "students_all";
+            const string cacheKey = CacheKeys.AllStudents;
             var cachedData = await _cache.GetStringAsync(cacheKey);
             if (!string.IsNullOrEmpty(cachedData))
             {
@@ -48,7 +57,7 @@ namespace StudentManagement.Application.Services
 
         public async Task<Student?> GetStudentByIdAsync(int id)
         {
-            var cacheKey = $"student_{id}";
+            var cacheKey = CacheKeys.Student(id);
             var cachedData = await _cache.GetStringAsync(cacheKey);
             if (!string.IsNullOrEmpty(cachedData))
             {
@@ -71,6 +80,15 @@ namespace StudentManagement.Application.Services
 
         public async Task SaveStudentAsync(Student student)
         {
+            if (_validationChain is not null)
+            {
+                var error = await _validationChain.ValidateAsync(student);
+                if (!string.IsNullOrWhiteSpace(error))
+                {
+                    throw new ValidationException(error);
+                }
+            }
+
             if (student.Id == 0)
             {
                 await _studentRepository.AddAsync(student);
@@ -92,10 +110,10 @@ namespace StudentManagement.Application.Services
 
         private async Task InvalidateCacheAsync(int? studentId = null)
         {
-            await RemoveAsync("students_all");
+            await RemoveAsync(CacheKeys.AllStudents);
             if (studentId.HasValue)
             {
-                await RemoveAsync($"student_{studentId.Value}");
+                await RemoveAsync(CacheKeys.Student(studentId.Value));
             }
         }
 

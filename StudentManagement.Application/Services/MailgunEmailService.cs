@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using StudentManagement.Application.Interfaces;
 using System.Net.Http.Headers;
 
@@ -10,13 +11,17 @@ namespace StudentManagement.Application.Services
         private readonly string _apiKey;
         private readonly string _domain;
         private readonly string _fromEmail;
+        private readonly bool _enabled;
+        private readonly ILogger<MailgunEmailService> _logger;
 
-        public MailgunEmailService(HttpClient httpClient, IConfiguration config)
+        public MailgunEmailService(HttpClient httpClient, IConfiguration config, ILogger<MailgunEmailService> logger)
         {
             _httpClient = httpClient;
             _apiKey = config["Mailgun:ApiKey"]!;
             _domain = config["Mailgun:Domain"]!;
             _fromEmail = config["Mailgun:FromEmail"]!;
+            _enabled = bool.TryParse(config["Mailgun:Enabled"], out var enabled) && enabled;
+            _logger = logger;
         }
 
         public async Task SendMfaCodeHtmlAsync(string toEmail, string mfaCode)
@@ -34,7 +39,14 @@ namespace StudentManagement.Application.Services
 
         public async Task SendEmailAsync(string toEmail, string subject, string body, bool isHtml = false)
         {
-            return;
+            if (!_enabled)
+            {
+                _logger.LogInformation(
+                    "Mailgun sending is disabled (Mailgun:Enabled); skipped email with subject {Subject}",
+                    subject);
+                return;
+            }
+
             var request = new HttpRequestMessage(
                 HttpMethod.Post,
                 $"https://api.mailgun.net/v3/{_domain}/messages"
@@ -61,6 +73,8 @@ namespace StudentManagement.Application.Services
 
             var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
+
+            _logger.LogInformation("Mailgun email with subject {Subject} sent", subject);
         }
     }
 }

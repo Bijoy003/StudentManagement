@@ -9,14 +9,10 @@ namespace StudentManagement.Application.Services;
 
 public class TeacherService : ITeacherService
 {
-    // Duplicated from CourseService/EnrollmentService on purpose: those own the cache
-    // entries, and TeacherService writes must evict the exact same keys or the other
+    // Cache keys come from CacheKeys (single source of truth): CourseService/EnrollmentService
+    // own the entries, and TeacherService writes must evict the exact same keys or the other
     // services keep serving stale data (e.g. a teacher-created course missing from the
     // /Enrollment/Create dropdown for up to the 60 s TTL).
-    private const string AllCoursesCacheKey = "courses_all";
-    private const string CourseStudentCountsCacheKey = "course_student_counts";
-    private const string AllEnrollmentsCacheKey = "enrollments_all";
-
     private readonly ICourseRepository _courseRepository;
     private readonly IEnrollmentRepository _enrollmentRepository;
     private readonly IDistributedCache _cache;
@@ -89,9 +85,9 @@ public class TeacherService : ITeacherService
         // within their 60 s TTL; the same rationale covers the per-student
         // "enrollment_courses_student_{studentId}" entries of the enrolled students,
         // which are likewise not enumerable from a course id.
-        RemoveFromMemoryCache(AllEnrollmentsCacheKey);
-        RemoveFromMemoryCache($"enrollment_course_{courseId}");
-        RemoveFromMemoryCache($"enrollment_students_course_{courseId}");
+        RemoveFromMemoryCache(CacheKeys.AllEnrollments);
+        RemoveFromMemoryCache(CacheKeys.EnrollmentsByCourse(courseId));
+        RemoveFromMemoryCache(CacheKeys.StudentsInCourse(courseId));
         return true;
     }
 
@@ -130,20 +126,20 @@ public class TeacherService : ITeacherService
     // Mirrors CourseService.InvalidateCacheAsync for a single course write.
     private async Task InvalidateCourseCacheAsync(int courseId)
     {
-        await RemoveAsync(AllCoursesCacheKey);
-        await RemoveAsync(CourseStudentCountsCacheKey);
-        await RemoveAsync($"course_{courseId}");
+        await RemoveAsync(CacheKeys.AllCourses);
+        await RemoveAsync(CacheKeys.CourseStudentCounts);
+        await RemoveAsync(CacheKeys.Course(courseId));
     }
 
     // Mirrors EnrollmentService.InvalidateCacheAsync for a single enrollment write.
     private async Task InvalidateEnrollmentCacheAsync(int enrollmentId, int courseId, int studentId)
     {
-        RemoveFromMemoryCache(AllEnrollmentsCacheKey);
-        RemoveFromMemoryCache($"enrollment_{enrollmentId}");
-        RemoveFromMemoryCache($"enrollment_course_{courseId}");
-        RemoveFromMemoryCache($"enrollment_students_course_{courseId}");
-        RemoveFromMemoryCache($"enrollment_courses_student_{studentId}");
-        await RemoveAsync(CourseStudentCountsCacheKey);
+        RemoveFromMemoryCache(CacheKeys.AllEnrollments);
+        RemoveFromMemoryCache(CacheKeys.Enrollment(enrollmentId));
+        RemoveFromMemoryCache(CacheKeys.EnrollmentsByCourse(courseId));
+        RemoveFromMemoryCache(CacheKeys.StudentsInCourse(courseId));
+        RemoveFromMemoryCache(CacheKeys.CoursesForStudent(studentId));
+        await RemoveAsync(CacheKeys.CourseStudentCounts);
     }
 
     private void RemoveFromMemoryCache(string cacheKey)
