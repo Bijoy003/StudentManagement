@@ -1,4 +1,5 @@
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StudentManagement.Application.Configuration;
 using StudentManagement.Application.Interfaces;
@@ -13,6 +14,7 @@ namespace StudentManagement.Application.Services
         private readonly IMcpToolProvider _mcpToolProvider;
         private readonly ChatFeatureOptions _features;
         private readonly McpOptions _mcpOptions;
+        private readonly ILogger<ChatService> _logger;
 
         public ChatService(
             IChatClient chatClient,
@@ -20,7 +22,8 @@ namespace StudentManagement.Application.Services
             ChatTools chatTools,
             IMcpToolProvider mcpToolProvider,
             IOptions<ChatFeatureOptions> features,
-            IOptions<McpOptions> mcpOptions)
+            IOptions<McpOptions> mcpOptions,
+            ILogger<ChatService> logger)
         {
             _chatClient = chatClient;
             _appKnowledge = appKnowledge;
@@ -28,6 +31,7 @@ namespace StudentManagement.Application.Services
             _mcpToolProvider = mcpToolProvider;
             _features = features.Value;
             _mcpOptions = mcpOptions.Value;
+            _logger = logger;
         }
 
         public async Task<string> GetReplyAsync(IReadOnlyList<ChatMessage> history, CancellationToken cancellationToken = default)
@@ -35,16 +39,8 @@ namespace StudentManagement.Application.Services
             var userQuery = history.LastOrDefault(m => m.Role == ChatRole.User)?.Text ?? string.Empty;
 
             var ragContext = _features.IncludeRag
-                ? await _appKnowledge.SearchRelevantChunks(userQuery, _features.MaxRagChunks)
+                ? await TryGetRagContextAsync(userQuery)
                 : string.Empty;
-
-            var systemPrompt = BuildSystemPrompt(ragContext);
-
-            var messages = new List<ChatMessage>
-            {
-                new(ChatRole.System, systemPrompt)
-            };
-            messages.AddRange(history);
 
             var tools = new List<AITool>();
             if (_features.IncludeTools)
@@ -57,6 +53,14 @@ namespace StudentManagement.Application.Services
                 tools.AddRange(await _mcpToolProvider.GetToolsAsync(cancellationToken));
             }
 
+            var systemPrompt = BuildSystemPrompt(ragContext, tools.Count > 0);
+
+            var messages = new List<ChatMessage>
+            {
+                new(ChatRole.System, systemPrompt)
+            };
+            messages.AddRange(history);
+
             var options = new ChatOptions();
             if (tools.Count > 0)
             {
@@ -67,17 +71,45 @@ namespace StudentManagement.Application.Services
             return response.Text ?? string.Empty;
         }
 
-        private string BuildSystemPrompt(string ragContext)
+        // RAG is best-effort context: a missing embedding model or an unreachable ChromaDB
+        // must downgrade the answer, not fail the whole chat request with a 503.
+        private async Task<string> TryGetRagContextAsync(string userQuery)
         {
-            var prompt = """
+            try
+            {
+                return await _appKnowledge.SearchRelevantChunks(userQuery, _features.MaxRagChunks);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "RAG retrieval failed; continuing without retrieved documentation.");
+                return string.Empty;
+            }
+        }
+
+        private string BuildSystemPrompt(string ragContext, bool hasTools)
+        {
+            var instructions = new List<string>
+            {
+                "- Answer questions about how to use the app using the documentation provided."
+            };
+
+            // Only instruct tool use when tools are actually declared. Small local models
+            // (e.g. gemma4:e2b) otherwise emit a tool call that the provider drops, leaving
+            // an empty reply.
+            if (hasTools)
+            {
+                instructions.Add("- When the user asks for live data (students, courses, enrollments, counts, or reports), call the available tools. Do not invent records or numbers.");
+            }
+
+            instructions.Add("- If a tool returns no data or an error, tell the user clearly.");
+            instructions.Add("- Keep answers concise and formatted with markdown when helpful.");
+            instructions.Add("- You cannot create, update, or delete data through chat; direct users to the appropriate page in the UI for changes.");
+
+            var prompt = $"""
                 You are a helpful assistant for the Student Management application.
 
                 ## Instructions
-                - Answer questions about how to use the app using the documentation provided.
-                - When the user asks for live data (students, courses, enrollments, counts, or reports), call the available tools. Do not invent records or numbers.
-                - If a tool returns no data or an error, tell the user clearly.
-                - Keep answers concise and formatted with markdown when helpful.
-                - You cannot create, update, or delete data through chat; direct users to the appropriate page in the UI for changes.
+                {string.Join(Environment.NewLine, instructions)}
                 """;
 
             if (_mcpOptions.Enabled)
@@ -95,13 +127,16 @@ namespace StudentManagement.Application.Services
 
             if (_features.IncludeFullDocumentation)
             {
-                var documentation = _appKnowledge.GetDocumentation();
-                prompt += $"""
+                var documentation = TryGetDocumentation();
+                if (!string.IsNullOrWhiteSpace(documentation))
+                {
+                    prompt += $"""
 
 
-                    ## Application documentation
-                    {documentation}
-                    """;
+                        ## Application documentation
+                        {documentation}
+                        """;
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(ragContext))
@@ -115,6 +150,19 @@ namespace StudentManagement.Application.Services
             }
 
             return prompt;
+        }
+
+        private string TryGetDocumentation()
+        {
+            try
+            {
+                return _appKnowledge.GetDocumentation();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Loading the embedded application documentation failed; continuing without it.");
+                return string.Empty;
+            }
         }
     }
 }
