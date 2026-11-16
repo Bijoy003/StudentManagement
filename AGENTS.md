@@ -1,15 +1,7 @@
 # StudentManagement
 
-ASP.NET Core MVC system for students, courses, and enrollments (.NET 8, Clean Architecture, SQL Server)
+ASP.NET Core 8 MVC for students, courses, and enrollments (Clean Architecture, SQL Server, EF Core 8)
 with Identity auth, an AI chat/RAG assistant, a RAG evaluation harness, and Playwright E2E tests.
-
-## Stack
-
-- **.NET 8** MVC + attribute-routed REST API (`/api/students`, `/api/evaluation`), nullable + implicit usings
-- **EF Core 8 / SQL Server** — writable `ApplicationDbContext` + read-only `ReadOnlyDbContext`; migrations auto-apply at startup
-- **Identity** (cookie + Google, TOTP MFA, roles Admin/Teacher/Student/User) · **IP rate limiting** · **Redis-or-memory cache**
-- **AI**: Microsoft.Extensions.AI → OpenAI-compatible endpoint (Ollama default), ChromaDB RAG, function tools, stdio MCP
-- **Ops**: Serilog (JSON + rolling files), OpenTelemetry, Prometheus · **Tests**: xUnit + Moq, Playwright in `e2e/`
 
 ## Commands
 
@@ -18,7 +10,7 @@ with Identity auth, an AI chat/RAG assistant, a RAG evaluation harness, and Play
 | Build / unit tests | `dotnet build` · `dotnet test` |
 | Run | `dotnet run --project StudentManagement` (http://localhost:5255) |
 | E2E | `scripts/e2e.ps1` (`-Headed`, `-KeepDb`) · or `cd e2e; npx playwright test` |
-| Docker stack | `docker-compose up` (web :8080 + SQL Server + Redis) — needs `AdditionalConfig__Path` set, see Landmines |
+| Docker stack | `docker-compose up` (web :8080 + SQL Server + Redis) — needs `AdditionalConfig__Path` |
 | New migration | `dotnet ef migrations add <Name>` in Infrastructure — never run `database update` by hand |
 | RAG evaluation | `dotnet run --project StudentManagement -- evaluate --help` |
 
@@ -26,45 +18,35 @@ Seeded admin: `admin@admin.com` / `Admin123` (and `bhugolbijoy003@gmail.com`).
 
 ## Non-negotiable rules
 
-1. **Layering:** Domain (no deps) ← Application; Domain ← Infrastructure; Web → Application + Infrastructure + Domain; Tests → Application + Web.
-   Never let Domain depend on anything, or Application depend on Infrastructure/Web.
-2. **The REST API never binds or serializes domain entities** — use `Application/DTOs/`; don't add new endpoints that bind entities directly either.
-3. **Writes go Application service → repository.** Repositories use `ApplicationDbContext` for writes, `ReadOnlyDbContext` + `AsNoTracking()` for `*ReadOnly` reads; `Include()` belongs in the repository, not the service.
-4. **Style:** file-scoped namespaces, constructor injection with `_camelCase` fields, `Async` suffix on async methods, no XML docs (except `[Description]` on `ChatTools` methods), test names `{Method}_{Scenario}_Returns{Expected}`.
-5. **Schema change ⇒ EF Core migration** (startup applies it with 10 retries × 5 s). No raw SQL, no hand-edited migration history.
+1. **Layering:** Domain (no deps) ← Application; Domain ← Infrastructure; Web → all three; Tests → Application + Web.
+   Domain never depends on anything; Application never depends on Infrastructure/Web.
+2. **The REST API never binds or serializes domain entities** — use `Application/DTOs/`; no new endpoints that bind entities.
+3. **Writes go Application service → repository.** Repositories use `ApplicationDbContext` for writes, `ReadOnlyDbContext` + `AsNoTracking()` for `*ReadOnly`; `Include()` belongs in the repository, not the service.
+4. **Style:** file-scoped namespaces, ctor injection with `_camelCase` fields, `Async` suffix, no XML docs (except `[Description]` on `ChatTools`), test names `{Method}_{Scenario}_Returns{Expected}`.
+5. **Schema change ⇒ EF Core migration** (startup applies it, 10 retries × 5 s). No raw SQL, no hand-edited history.
 6. **Never modify `CourseRepositoryTests.UpdateCourse_ConcurrentLoop_ShouldExposeRaceCondition`** — known-flaky SQLite test: retry once, then flag.
-7. **No secrets in `appsettings*.json`.** Keep placeholders/empty strings in committed config; real values live in user-secrets locally (Web project has a `UserSecretsId`) or env vars (`Section__Key`) in Docker/CI. Older commits on other branches still contain leaked keys, so rotate anything reused.
+7. **No secrets in `appsettings*.json`.** Placeholders in committed config; real values in user-secrets or `Section__Key` env vars.
+
+## Landmines
+
+- **Chat provider is switchable** via `Chat:ActiveProvider` + `Chat:Providers:<name>` (`Endpoint`/`Model`/`ApiKey`); an empty `ActiveProvider` keeps the flat `Chat:Endpoint`/`Model`/`ApiKey` as the default, so existing configs are unaffected. `Chat:EmbeddingProvider` pins embeddings separately (defaults to the active provider) — set it to `Ollama` when chat moves to a provider without an embeddings API. An unknown provider name throws at startup; switching needs a restart. Keys stay in user-secrets (`Chat:Providers:<name>:ApiKey`).
+- **`AdditionalConfig:Path` is required** (`optional: false`) — startup throws without it; override with `AdditionalConfig__Path` (E2E uses `scripts/appsettings.e2e.json`). `docker-compose.yml` does **not** set it.
+- **Mailgun sends only when `Mailgun:Enabled=true`** (committed default `false`) — forgot-password delivers no mail; test by reading the reset token, not the mailbox.
+- **`StudentController.SaveStudent` enforces `[ValidateAntiForgeryToken]`** — `wwwroot/js/student.js` sends it in the `RequestVerificationToken` header. `CourseController.Save` and `EnrollmentController.Save` JSON POSTs still carry no token.
+- **Deleting a student or course cascades its enrollments**; `IArchiveService` is registered but called by nothing.
+- **`dotnet run` spawns a child Kestrel process** — kill with `taskkill /T /F` or by port, or the next run hits "address already in use".
+- `wwwroot/lib/` is gitignored and restored on build; unit tests use SQLite, not SQL Server.
 
 ## Where the detail lives
 
-This file is the index, not the manual. Read the matching sub-agent file before working in an area — each is also directly delegable.
+Read the matching file before working in an area; each is also delegable. `*-expert` agents explain/map/audit and do not edit (except `chat-rag-expert`, `rag-evaluation-expert` in their own area); hand code changes to `implementer`.
 
-| You need… | Read / delegate to |
-|---|---|
-| **Student** work (MVC + REST, DTOs, cache) | `.opencode/agent/student-expert.md` (runbook) → `web-api-expert.md`, `domain-expert.md` |
-| **Course** work (counts cache, client ResponseCache) | Feature slice map → `domain-expert.md` (caching), `web-api-expert.md` (quirks) |
-| **Enrollment** work (cascade, stale counts, unawaited delete) | Feature slice map → `domain-expert.md` (invariants, caching) |
-| **Auth / admin** (login, MFA, Google, reset, roles) | `.opencode/agent/identity-security-expert.md` |
-| **Chat / RAG** (prompt, tools, ChromaDB, MCP) | `.opencode/agent/chat-rag-expert.md` |
-| **Evaluation** (dataset, metrics, CLI, CI gate) | `.opencode/agent/rag-evaluation-expert.md` |
-| Cross-cutting: entities, invariants, archiving, risks | `.opencode/agent/domain-expert.md` |
-| Cross-cutting: file map, DI lifetimes, config, migrations, logging | `.opencode/agent/architecture-expert.md` |
-| Cross-cutting: routes, status codes, DTO/PATCH, Razor/jQuery | `.opencode/agent/web-api-expert.md` |
-| TDD tests / feature code / build fixes / diff review | `.opencode/agent/{test-planner,implementer,self-healer,pr-reviewer}.md` |
-| Task recipes | `.opencode/skills/*/SKILL.md` — add-migration, ai-chat-tools, rag-knowledge, playwright-e2e, run-and-verify, tdd-feature |
+`.opencode/agent/`: `student-expert` (student slice runbook) · `domain-expert` (entities, invariants, grades, cascade, caching) · `web-api-expert` (routes, status codes, DTO/PATCH, Razor/jQuery) · `architecture-expert` (file map, DI lifetimes, config, migrations, logging) · `identity-security-expert` (login, MFA, Google, reset, roles, security gaps) · `chat-rag-expert` · `rag-evaluation-expert` · `{test-planner,implementer,self-healer,pr-reviewer}` (workflow). Runbooks describe procedure; reference docs are authoritative on rules and win on conflict.
 
-The `*-expert` agents explain, map, and audit; they do not edit (except `chat-rag-expert` and `rag-evaluation-expert` in their own area). **Runbooks** (`student-expert`, `chat-rag-expert`, `rag-evaluation-expert`) describe *procedure* — files, flows, checklists; the reference docs (`domain`, `architecture`, `web-api`, `identity-security`) are authoritative on *rules*, and win on conflict. Hand code changes to `implementer`.
+Recipes: `.opencode/skills/*/SKILL.md` — add-migration, ai-chat-tools, rag-knowledge, playwright-e2e, run-and-verify, tdd-feature.
 
 ## Default workflow
 
 `test-planner` (RED) → `implementer` (GREEN) → `self-healer` only if build/test fails → `pr-reviewer` before commit.
 
-Prefer `/ship <task>`: the `orchestrator` primary agent (`.opencode/agents/orchestrator.md`) drives this chain as a stage machine (intake/ACs → RED → GREEN → heal ≤2 → E2E when UI → review ≤2 cycles) and ends every commit with a `Workflow: RED(n)→GREEN→review PASS` trailer. A commit without that trailer counts as pipeline-skipped — never fake one for stages that didn't run.
-
-## Landmines
-
-- **`AdditionalConfig:Path` is required** (`optional: false`) — `Program.cs` loads `C:\inetpub\appsettings.json` and throws on startup when missing; override with `AdditionalConfig__Path` (E2E uses `scripts/appsettings.e2e.json`). `docker-compose.yml` does **not** set it, so the web container only starts if that file is baked into the image.
-- **Mailgun sends only when `Mailgun:Enabled=true`** — committed config defaults to `false`, so `SendEmailAsync` logs and skips without any HTTP call; set it via user-secrets/env (`Mailgun__Enabled`) to actually send. Forgot-password delivers no mail by default — test by reading the reset token, not the mailbox.
-- **`StudentController.SaveStudent` enforces `[ValidateAntiForgeryToken]`** — `wwwroot/js/student.js` sends the token via the `RequestVerificationToken` header, scraped from the layout's logout-form hidden input (sturdier meta-tag/endpoint source is a deferred follow-up). `CourseController.Save` and `EnrollmentController.Save` JSON POSTs still carry no token; admin/account forms do use it.
-- **Deleting a student or course cascades its enrollments**; `IArchiveService` is registered but called by nothing.
-- **`dotnet run` spawns a child Kestrel process** — kill with `taskkill /T /F` or by port, or the next run hits "address already in use".
+Prefer `/ship <task>`: the `orchestrator` primary agent drives that chain (intake/ACs → RED → GREEN → heal ≤2 → E2E when UI → review ≤2 cycles) and ends every commit with a `Workflow: RED(n)→GREEN→review PASS` trailer. A commit without the trailer counts as pipeline-skipped — never fake one for stages that didn't run.

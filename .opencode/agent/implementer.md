@@ -1,7 +1,8 @@
 ---
-description: Implements production code across all Clean Architecture layers (Domain, Application, Infrastructure, Web) to satisfy acceptance criteria and pass tests. Use for feature implementation, bug fixes, and refactors in this solution.
+description: Writes production code across all layers to satisfy acceptance criteria and pass tests.
 mode: subagent
-model: alibaba-token-plan/qwen3.8-flash
+model: opencode/deepseek-v4.1-flash-free
+steps: 50
 temperature: 0.2
 permission:
   edit: allow

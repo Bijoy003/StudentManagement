@@ -1,7 +1,8 @@
 ---
-description: Answers business-domain and data-model questions for StudentManagement — entities, invariants, grades, enrollment semantics, cascade deletes, caching staleness, archive rules, and which rules are NOT enforced. Use when asked how the system behaves, before changing an entity/service, or when a change could break a domain rule.
+description: How the domain behaves: entities, invariants, grades, cascade deletes, caching staleness, archiving.
 mode: subagent
-model: alibaba-token-plan/qwen3.8-flash
+model: opencode/deepseek-v4.1-flash-free
+steps: 25
 temperature: 0.1
 permission:
   edit: deny

@@ -1,7 +1,8 @@
 ---
-description: Principal architect that audits code changes against the project's Clean Architecture, conventions, DI, security, and EF Core rules. Use before committing/pushing to review a diff.
+description: Reviews a diff for Clean Architecture, conventions, DI, security, EF Core, and missing tests.
 mode: subagent
-model: alibaba-token-plan/glm-5.3
+model: opencode/glm-5.3-flash-free
+steps: 30
 temperature: 0.1
 permission:
   edit: deny

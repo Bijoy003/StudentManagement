@@ -69,5 +69,14 @@
     "glob": "allow",
     "todowrite": "allow"
   },
-  "model": "alibaba-token-plan/qwen3.8-max"
+  "compaction": {
+    "auto": true,
+    "buffer": "35%",
+    "keep": { "tokens": 12000 }
+  },
+  "tool_output": {
+    "max_lines": 600,
+    "max_bytes": 24576
+  },
+  "model": "opencode/deepseek-v4.1-flash-free"
 }

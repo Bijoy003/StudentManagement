@@ -1,7 +1,8 @@
 ---
-description: Diagnoses and fixes build/test failures (Self-Healer / SRE). Use when dotnet build or dotnet test fails and you need root-cause analysis plus minimal targeted patches.
+description: Fixes build/test failures: root-cause analysis plus minimal targeted patches.
 mode: subagent
-model: alibaba-token-plan/qwen3.8-flash
+model: opencode/deepseek-v4.1-flash-free
+steps: 40
 temperature: 0.1
 permission:
   edit: allow

@@ -1,7 +1,8 @@
 ---
-description: Writes xUnit + Moq test suites (TDD, RED phase) before production code. Use for planning and authoring tests for new features or fixes in StudentManagement.Tests.
+description: Writes xUnit + Moq tests (TDD RED phase) before production code.
 mode: subagent
-model: alibaba-token-plan/qwen3.8-flash
+model: opencode/deepseek-v4.1-flash-free
+steps: 40
 temperature: 0.2
 permission:
   edit: allow

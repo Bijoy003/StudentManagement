@@ -1,7 +1,8 @@
 ---
-description: Specialist for the AI chat / RAG subsystem (ChatService, ChatTools, AppKnowledgeService, SemanticChunker, document parsers, ChromaDB, MCP, Ollama config). Use for any work touching AI chat, embeddings, RAG knowledge, or MCP.
+description: AI chat/RAG work: ChatService, ChatTools, AppKnowledge, ChromaDB, embeddings, parsers, MCP.
 mode: subagent
-model: alibaba-token-plan/qwen3.8-flash
+model: opencode/deepseek-v4.1-flash-free
+steps: 45
 temperature: 0.2
 permission:
   edit: allow
@@ -36,7 +37,7 @@ Config: Chat / Chat:Features / Chat:Mcp / Chroma in appsettings*.json
 - **RAG docs**: files under `Application/AppKnowledge/` are embedded resources — adding a file there auto-includes it (no csproj change). `GetDocumentation()` returns their extracted text.
 - **Embeddings**: `Chat:Features:EmbeddingModel` (default `nomic-embed-text`) via `IEmbeddingGenerator<string, Embedding<float>>`.
 - **ChromaDB**: `Chroma:Endpoint` (default `http://localhost:8000`), collection `student-management`. Initialize happens on first chat use.
-- **Chat client**: OpenAI-compatible endpoint `Chat:Endpoint` (Ollama `/v1`, default `http://localhost:11434`), `Chat:Model` (default `qwen2.5:3b-instruct`). Uses `UseFunctionInvocation()` + `UseLogging()`.
+- **Chat client**: OpenAI-compatible endpoint resolved from `Chat:ActiveProvider` → `Chat:Providers:{name}` (`Endpoint`/`Model`/`ApiKey`), falling back to the flat `Chat:Endpoint`/`Model`/`ApiKey` when `ActiveProvider` is empty. Defaults to Ollama `/v1` (`http://localhost:11434`, `qwen2.5:3b-instruct`); `Chat:EmbeddingProvider` overrides where embeddings go (defaults to the active provider). `ChatOptions.Validate()` runs at startup (unknown provider / empty endpoint or model throws) and the extension appends `/v1` + substitutes the `unused` key placeholder. Uses `UseFunctionInvocation()` + `UseLogging()`.
 - **MCP**: `Chat:Mcp:Enabled` gates wiring (true in Development, false in Production). Servers: `jira` (uvx mcp-atlassian), `github` (npx, disabled). Tools are loaded with prefix `{serverKey}_` and cached by `McpToolProvider`.
 
 ## Common tasks
@@ -44,6 +45,7 @@ Config: Chat / Chat:Features / Chat:Mcp / Chroma in appsettings*.json
 - **New AI tool**: add a `[Description]` method in `ChatTools.cs` (JSON out via service layer) and register it in `GetTools()`. Keep the existing anonymous-object projection style.
 - **New RAG doc**: drop a `.md/.txt/.docx/.pdf` file in `Application/AppKnowledge/`.
 - **Change retrieval**: tune `MaxRagChunks`, the 0.7 distance threshold in `AppKnowledgeService`, or the 0.55 shift threshold in `SemanticChunker`.
+- **Switch provider** (e.g. Ollama ↔ an API-key provider): set `Chat:ActiveProvider` to a key under `Chat:Providers` (unknown names throw at startup) and keep the key in user-secrets (`Chat:Providers:<name>:ApiKey`). Add `Chat:EmbeddingProvider: "Ollama"` when the new provider has no embeddings API, otherwise RAG and the evaluation metrics point at an endpoint that 404s. Switching takes effect on restart; an empty `ActiveProvider` keeps the flat `Chat:Endpoint`/`Model`/`ApiKey`.
 - **Ollama model**: change `Chat:Model` (and `EmbeddingModel` for embeddings).
 
 ## Failure modes (what actually breaks)

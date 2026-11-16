@@ -1,7 +1,8 @@
 ---
-description: Reference for the HTTP surface of StudentManagement — MVC controller routes, the /api/* REST contracts (status codes, headers, media types), DTO and PATCH semantics, Razor/jQuery conventions, and the quirks of the JSON endpoints. Use when adding or changing an endpoint, wiring front-end JS, or debugging a 400/415/redirect.
+description: Add or change an endpoint: MVC routes, /api/* contracts, status codes, DTO/PATCH, Razor/jQuery.
 mode: subagent
-model: alibaba-token-plan/qwen3.8-flash
+model: opencode/deepseek-v4.1-flash-free
+steps: 25
 temperature: 0.1
 permission:
   edit: deny

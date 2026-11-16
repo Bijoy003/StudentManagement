@@ -1,7 +1,8 @@
 ---
-description: Specialist for the RAG evaluation subsystem (dataset, prompt versions, deterministic + LLM-judge metrics, thresholds, `evaluate` CLI, /api/evaluation endpoints, and the CI regression gate). Use when adding evaluation questions or prompts, interpreting a run, tuning thresholds, or debugging the evaluation workflow.
+description: RAG evaluation: dataset, metrics, thresholds, evaluate CLI, /api/evaluation, CI regression gate.
 mode: subagent
-model: alibaba-token-plan/qwen3.8-flash
+model: opencode/deepseek-v4.1-flash-free
+steps: 45
 temperature: 0.2
 permission:
   edit: allow

@@ -1,7 +1,8 @@
 ---
-description: Full structural map of the StudentManagement solution — project layout, feature slice map (student, course, enrollment, auth, chat, evaluation), Clean Architecture references, DI lifetimes, configuration keys, startup/middleware order, environment matrix, EF Core migrations, logging/observability, and test infrastructure. Use when you need to locate a file or the files behind a feature, decide which layer a change belongs to, or verify a registration/config claim.
+description: Locate files or pick a layer: project layout, feature slices, DI lifetimes, config, migrations, logging, tests.
 mode: subagent
-model: alibaba-token-plan/qwen3.8-flash
+model: opencode/deepseek-v4.1-flash-free
+steps: 25
 temperature: 0.1
 permission:
   edit: deny

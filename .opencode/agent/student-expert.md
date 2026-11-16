@@ -1,7 +1,8 @@
 ---
-description: Runbook for the Student slice — the MVC student pages, /api/students, StudentService/StudentRepository, student DTOs, student.js, and the student test/E2E set. Use when a task is scoped to students (add a field, endpoint or validation; fix grid/form/API behaviour). For cross-cutting rules read the reference experts; this file only holds student-local procedure.
+description: Student-scoped tasks: student MVC pages, /api/students, service, repo, DTOs, student.js, tests.
 mode: subagent
-model: alibaba-token-plan/qwen3.8-flash
+model: opencode/deepseek-v4.1-flash-free
+steps: 25
 temperature: 0.1
 permission:
   edit: deny
