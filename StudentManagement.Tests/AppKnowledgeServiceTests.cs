@@ -1,65 +1,196 @@
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Moq;
 using StudentManagement.Application.Configuration;
+using StudentManagement.Application.Interfaces;
 using StudentManagement.Application.Services;
 
-namespace StudentManagement.Tests
+namespace StudentManagement.Tests;
+
+public class AppKnowledgeServiceTests
 {
-    public class AppKnowledgeServiceTests
+    [Fact]
+    public void GetDocumentation_LoadsEmbeddedKnowledgeFiles_ReturnsApplicationText()
     {
-        [Fact]
-        public void GetDocumentation_LoadsEmbeddedKnowledgeFiles()
+        var service = CreateService(out _, out _);
+
+        var documentation = service.GetDocumentation();
+
+        Assert.Contains("Student Management", documentation);
+        Assert.Contains("Students", documentation);
+        Assert.Contains("Enrollments", documentation);
+    }
+
+    [Fact]
+    public void GetDocumentation_EmbedsEveryDocument_ReturnsBlankLineSeparatedContent()
+    {
+        var service = CreateService(out _, out _);
+
+        var documentation = service.GetDocumentation();
+
+        Assert.Contains(Environment.NewLine + Environment.NewLine, documentation);
+    }
+
+    [Fact]
+    public void GetDocumentation_CalledTwice_ReturnsCachedInstance()
+    {
+        var service = CreateService(out _, out _);
+
+        var first = service.GetDocumentation();
+        var second = service.GetDocumentation();
+
+        // string.Join would build a new string on every call; the same instance proves the
+        // in-process IMemoryCache served the second call.
+        Assert.Same(first, second);
+    }
+
+    [Fact]
+    public void GetDocumentation_AllParsers_ReturnsTextFromEmbeddedBinaryDocuments()
+    {
+        var service = CreateService(
+            out _,
+            out _,
+            new IDocumentParser[]
+            {
+                new TxtDocumentParser(),
+                new DocxDocumentParser(),
+                new PdfDocumentParser(),
+                new ExcelDocumentParser()
+            });
+
+        var documentation = service.GetDocumentation();
+
+        Assert.Contains("Advanced Reporting Guide", documentation);
+        Assert.Contains("Security Guide", documentation);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_LoadsChunks_ReturnsOneEmbeddedDocumentPerChunk()
+    {
+        var service = CreateService(out var store, out var embeddings);
+
+        await service.InitializeAsync();
+
+        Assert.Equal(1, store.ReplaceCalls);
+        Assert.NotEmpty(store.Documents);
+        Assert.All(store.Documents, document =>
         {
-            var service = CreateService();
+            Assert.False(string.IsNullOrWhiteSpace(document.Title));
+            Assert.False(string.IsNullOrWhiteSpace(document.Content));
+            Assert.Equal(384, document.Embedding.Length);
+        });
+        Assert.NotEmpty(embeddings.Batches);
+    }
 
-            var documentation = service.GetDocumentation();
+    [Fact]
+    public async Task InitializeAsync_CalledConcurrently_ReturnsSingleReplaceCall()
+    {
+        var service = CreateService(out var store, out _);
 
-            Assert.Contains("Student Management", documentation);
-            Assert.Contains("Students", documentation);
-            Assert.Contains("Enrollments", documentation);
-        }
+        await Task.WhenAll(Enumerable.Range(0, 10).Select(_ => service.InitializeAsync()));
 
-        [Fact]
-        public void GetDocumentation_CalledTwice_ReturnsCachedInstance()
-        {
-            var service = CreateService();
+        Assert.Equal(1, store.ReplaceCalls);
+    }
 
-            var first = service.GetDocumentation();
-            var second = service.GetDocumentation();
+    [Fact]
+    public async Task SearchRelevantChunks_EmptyQuery_ReturnsEmptyWithoutEmbeddingOrQuery()
+    {
+        var service = CreateService(out var store, out var embeddings);
 
-            // string.Join would build a new string on every call; the same instance proves the
-            // in-process IMemoryCache served the second call.
-            Assert.Same(first, second);
-        }
+        var result = await service.SearchRelevantChunks("   ", 3);
 
-        private static AppKnowledgeService CreateService()
-        {
-            var mockEmbedding = new Mock<IEmbeddingGenerator<string, Embedding<float>>>();
-            mockEmbedding
-                .Setup(m => m.GenerateAsync(It.IsAny<IList<string>>(), null, default))
-                .Returns<IList<string>, object?, CancellationToken>((strings, _, _) =>
-                {
-                    var embeddings = strings.Select(s => new Embedding<float>(new float[384])).ToList();
-                    return Task.FromResult(new GeneratedEmbeddings<Embedding<float>>(embeddings));
-                });
+        Assert.Equal(string.Empty, result);
+        Assert.Equal(0, store.QueryCalls);
+        Assert.Equal(0, embeddings.Calls);
+    }
 
-            var features = Options.Create(new ChatFeatureOptions());
-            var chromaOptions = Options.Create(new ChromaOptions());
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task SearchRelevantChunks_NonPositiveMaxChunks_ReturnsEmptyWithoutQuery(int maxChunks)
+    {
+        var service = CreateService(out var store, out _);
 
-            return new AppKnowledgeService(
-                mockEmbedding.Object,
-                features,
-                null!,
-                null!,
-                chromaOptions,
-                new HttpClient(),
-                [new TxtDocumentParser()],
-                new SemanticChunker(mockEmbedding.Object),
-                new MemoryCache(new MemoryCacheOptions()),
-                NullLogger<AppKnowledgeService>.Instance);
-        }
+        var result = await service.SearchRelevantChunks("students", maxChunks);
+
+        Assert.Equal(string.Empty, result);
+        Assert.Equal(0, store.QueryCalls);
+    }
+
+    [Fact]
+    public async Task SearchRelevantChunks_RelevantResult_ReturnsTitleAndContent()
+    {
+        var service = CreateService(out var store, out _);
+        store.Results.Add(new VectorSearchResult("Students", "The Students page lists records.", 0.2f));
+
+        var result = await service.SearchRelevantChunks("students", 5);
+
+        Assert.Equal("### Students\nThe Students page lists records.", result);
+        Assert.Equal(5, store.LastMaxResults);
+        Assert.Equal(384, store.LastEmbedding.Length);
+    }
+
+    [Fact]
+    public async Task SearchRelevantChunks_MultipleResults_ReturnsOnlyResultsBelowThreshold()
+    {
+        var service = CreateService(out var store, out _);
+        store.Results.AddRange(
+        [
+            new VectorSearchResult("Close", "close content", 0.2f),
+            new VectorSearchResult("Boundary", "boundary content", 0.7f),
+            new VectorSearchResult("Far", "far content", 0.9f)
+        ]);
+
+        var result = await service.SearchRelevantChunks("students", 3);
+
+        Assert.Contains("close content", result);
+        Assert.DoesNotContain("boundary content", result);
+        Assert.DoesNotContain("far content", result);
+    }
+
+    [Fact]
+    public async Task SearchRelevantChunks_NoResults_ReturnsEmpty()
+    {
+        var service = CreateService(out _, out _);
+
+        var result = await service.SearchRelevantChunks("students", 3);
+
+        Assert.Equal(string.Empty, result);
+    }
+
+    [Fact]
+    public async Task SearchRelevantChunks_MultipleRelevantResults_ReturnsBlankLineSeparatedSections()
+    {
+        var service = CreateService(out var store, out _);
+        store.Results.AddRange(
+        [
+            new VectorSearchResult("One", "first", 0.1f),
+            new VectorSearchResult("Two", "second", 0.2f)
+        ]);
+
+        var result = await service.SearchRelevantChunks("students", 2);
+
+        Assert.Equal($"### One\nfirst{Environment.NewLine}{Environment.NewLine}### Two\nsecond", result);
+    }
+
+    private static AppKnowledgeService CreateService(
+        out FakeVectorStore store,
+        out FakeEmbeddingGenerator embeddings,
+        IDocumentParser[]? parsers = null)
+    {
+        store = new FakeVectorStore();
+        embeddings = new FakeEmbeddingGenerator();
+
+        var features = Options.Create(new ChatFeatureOptions());
+        var chunker = new SemanticChunker(embeddings);
+
+        return new AppKnowledgeService(
+            embeddings,
+            features,
+            store,
+            parsers ?? new IDocumentParser[] { new TxtDocumentParser() },
+            chunker,
+            new MemoryCache(new MemoryCacheOptions()),
+            NullLogger<AppKnowledgeService>.Instance);
     }
 }

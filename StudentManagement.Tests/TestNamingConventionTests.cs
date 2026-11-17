@@ -18,7 +18,14 @@ public class TestNamingConventionTests
         typeof(StudentValidationChainTests),
         typeof(CacheKeysTests),
         typeof(MailgunEmailServiceTests),
-        typeof(AntiForgeryAttributeTests)
+        typeof(AntiForgeryAttributeTests),
+        typeof(AppKnowledgeServiceTests),
+        typeof(ChatControllerTests),
+        typeof(ChatToolsTests),
+        typeof(SemanticChunkerTests),
+        typeof(DocumentParserTests),
+        typeof(ChatConfigurationTests),
+        typeof(ChatContractTests)
     };
 
     private static readonly Regex Convention = new(
