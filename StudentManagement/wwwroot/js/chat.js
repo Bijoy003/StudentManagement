@@ -152,7 +152,15 @@ function renderMarkdown(text) {
     }
 
     const normalized = normalizeAssistantMarkdown(text);
-    return marked.parse(normalized);
+    const html = marked.parse(normalized);
+
+    // Model output is untrusted: never inject raw HTML into the page.
+    if (typeof DOMPurify !== 'undefined') {
+        return DOMPurify.sanitize(html);
+    }
+
+    // If the sanitizer is unavailable (offline/CDN failure), fail closed.
+    return escapeHtml(text);
 }
 
 function normalizeAssistantMarkdown(text) {

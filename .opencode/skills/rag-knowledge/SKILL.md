@@ -34,7 +34,7 @@ AppKnowledge/** (embedded resources)
 ## Infrastructure
 
 - **ChromaDB** must be running at `Chroma:Endpoint` (`http://localhost:8000`) — start it separately (`chroma run` / Docker). Collection `student-management` is created on init.
-- **Ollama** must serve the embedding model (`Chat:Features:EmbeddingModel`).
+- **An embeddings endpoint** must serve `Chat:Features:EmbeddingModel` — the `Chat:EmbeddingProvider` profile, which defaults to `Chat:ActiveProvider`. Point it at Ollama (e.g. `"EmbeddingProvider": "Ollama"`) when chat runs on an API-key provider that has no embeddings API. Changing the embedding model changes vector dimensions — delete the Chroma collection first.
 - **Singleton scopes:** `AppKnowledgeService`, `SemanticChunker`, `ChromaClient`, parsers, embedding generator are all Singleton (see `ChatClientServiceCollectionExtensions.cs`) — preserve this.
 
 ## Testing

@@ -1,4 +1,3 @@
-using ChromaDB.Client;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
@@ -14,10 +13,7 @@ namespace StudentManagement.Application.Services
 
         private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
         private readonly int _maxRagChunks;
-        private readonly ChromaClient _chromaClient;
-        private readonly ChromaConfigurationOptions _chromaConfig;
-        private readonly ChromaOptions _chromaOptions;
-        private readonly HttpClient _httpClient;
+        private readonly IVectorStore _vectorStore;
         private readonly IEnumerable<IDocumentParser> _parsers;
         private readonly SemanticChunker _semanticChunker;
         private readonly IMemoryCache _memoryCache;
@@ -25,16 +21,12 @@ namespace StudentManagement.Application.Services
         private readonly Lazy<Task> _initialization;
 
         private IReadOnlyList<KnowledgeChunk> _chunks = [];
-        private ChromaCollectionClient? _collectionClient;
         private bool _chunksLoaded;
 
         public AppKnowledgeService(
             IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
             IOptions<ChatFeatureOptions> features,
-            ChromaClient chromaClient,
-            ChromaConfigurationOptions chromaConfig,
-            IOptions<ChromaOptions> chromaOptions,
-            HttpClient httpClient,
+            IVectorStore vectorStore,
             IEnumerable<IDocumentParser> parsers,
             SemanticChunker semanticChunker,
             IMemoryCache memoryCache,
@@ -42,10 +34,7 @@ namespace StudentManagement.Application.Services
         {
             _embeddingGenerator = embeddingGenerator;
             _maxRagChunks = features.Value.MaxRagChunks;
-            _chromaClient = chromaClient;
-            _chromaConfig = chromaConfig;
-            _chromaOptions = chromaOptions.Value;
-            _httpClient = httpClient;
+            _vectorStore = vectorStore;
             _parsers = parsers;
             _semanticChunker = semanticChunker;
             _memoryCache = memoryCache;
@@ -71,26 +60,16 @@ namespace StudentManagement.Application.Services
         {
             LoadChunks();
 
-            var metadata = new Dictionary<string, object> { { "hnsw:space", "cosine" } };
-            var collection = await _chromaClient.GetOrCreateCollection(_chromaOptions.CollectionName, metadata);
-            _collectionClient = new ChromaCollectionClient(collection, _chromaConfig, _httpClient);
-
-            var existing = await _collectionClient.Get();
-            if (existing.Count > 0)
-            {
-                await _collectionClient.Delete(existing.Select(r => r.Id).ToList());
-            }
-
             var embeddings = await GenerateEmbeddingsAsync(_chunks);
-            var ids = _chunks.Select(_ => Guid.NewGuid().ToString()).ToList();
-            var documents = _chunks.Select(c => c.Content).ToList();
-            var metadatas = _chunks.Select(c => new Dictionary<string, object> { { "title", c.Title } }).ToList();
-            var readonlyEmbs = embeddings.Select(e => new ReadOnlyMemory<float>(e)).ToList();
+            var documents = _chunks
+                .Select((chunk, index) => new VectorDocument(
+                    Guid.NewGuid().ToString(),
+                    chunk.Title,
+                    chunk.Content,
+                    embeddings[index]))
+                .ToList();
 
-            await _collectionClient.Add(ids,
-                embeddings: readonlyEmbs,
-                documents: documents,
-                metadatas: metadatas);
+            await _vectorStore.ReplaceAsync(documents);
         }
 
         public string GetDocumentation()
@@ -133,14 +112,11 @@ namespace StudentManagement.Application.Services
                 return string.Empty;
             }
 
-            var results = await _collectionClient!.Query(
-                new ReadOnlyMemory<float>(queryEmbedding),
-                nResults: maxChunks,
-                include: ChromaQueryInclude.Metadatas | ChromaQueryInclude.Documents | ChromaQueryInclude.Distances);
+            var results = await _vectorStore.QueryAsync(new ReadOnlyMemory<float>(queryEmbedding), maxChunks);
 
             var formatted = results
                 .Where(r => r.Distance < 0.7f)
-                .Select(r => $"### {r.Metadata!["title"]}\n{r.Document}")
+                .Select(r => $"### {r.Title}\n{r.Content}")
                 .ToList();
 
             return formatted.Count == 0
@@ -159,7 +135,6 @@ namespace StudentManagement.Application.Services
             foreach (var name in resourceNames)
             {
                 var title = ExtractTitle(name);
-                var extension = Path.GetExtension(name)?.ToLowerInvariant() ?? "";
 
                 var parser = _parsers.FirstOrDefault(p => p.CanParse(name));
                 if (parser == null)

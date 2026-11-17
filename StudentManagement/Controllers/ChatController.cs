@@ -10,6 +10,8 @@ namespace StudentManagement.Web.Controllers
     [Authorize]
     public class ChatController : Controller
     {
+        private static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+
         private readonly IChatService _chatService;
         private readonly IEnumerable<IDocumentParser> _parsers;
         private readonly ILogger<ChatController> _logger;
@@ -27,11 +29,16 @@ namespace StudentManagement.Web.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> Send([FromBody] ChatRequest request, CancellationToken cancellationToken)
+        public async Task<IActionResult> Send([FromBody] ChatRequest? request, CancellationToken cancellationToken)
         {
-            if (request.Messages is null || request.Messages.Count == 0)
+            if (request?.Messages is null || request.Messages.Count == 0)
             {
                 return BadRequest(new { error = "At least one message is required." });
+            }
+
+            if (request.Messages.Any(m => m is null))
+            {
+                return BadRequest(new { error = "Each message is required." });
             }
 
             var lastMessage = request.Messages[^1];
@@ -40,43 +47,21 @@ namespace StudentManagement.Web.Controllers
                 return BadRequest(new { error = "Message text or file is required." });
             }
 
-            var history = new List<ChatMessage>();
-            var imageExtensions = new[] { ".png", ".jpg", ".jpeg", ".gif", ".webp" };
-            foreach (var m in request.Messages)
+            List<ChatMessage> history;
+            try
             {
-                var role = ParseRole(m.Role);
-                if (!string.IsNullOrWhiteSpace(m.FileData) && !string.IsNullOrWhiteSpace(m.FileName))
-                {
-                    var ext = Path.GetExtension(m.FileName)?.ToLowerInvariant();
-                    if (ext != null && imageExtensions.Contains(ext))
-                    {
-                        var contents = new List<AIContent>();
-                        if (!string.IsNullOrWhiteSpace(m.Text))
-                            contents.Add(new TextContent(m.Text));
-                        var mimeType = ext switch
-                        {
-                            ".png" => "image/png",
-                            ".jpg" or ".jpeg" => "image/jpeg",
-                            ".gif" => "image/gif",
-                            ".webp" => "image/webp",
-                            _ => "image/png"
-                        };
-                        contents.Add(new DataContent(m.FileData, mimeType));
-                        history.Add(new ChatMessage(role, contents));
-                    }
-                    else
-                    {
-                        var fileText = await ParseFileContent(m.FileName, m.FileData);
-                        var combinedText = string.IsNullOrWhiteSpace(m.Text)
-                            ? $"[Attached file: {m.FileName}]\n\n{fileText}"
-                            : $"{m.Text}\n\n[Attached file: {m.FileName}]\n\n{fileText}";
-                        history.Add(new ChatMessage(role, combinedText));
-                    }
-                }
-                else
-                {
-                    history.Add(new ChatMessage(role, m.Text));
-                }
+                history = await BuildHistoryAsync(request.Messages);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // A malformed attachment must be a client error, not the provider-unavailable 503
+                // and definitely not an unhandled 500.
+                _logger.LogWarning(ex, "Failed to parse a chat attachment.");
+                return BadRequest(new { error = "The attached file could not be read." });
             }
 
             try
@@ -91,11 +76,70 @@ namespace StudentManagement.Web.Controllers
             }
         }
 
-        private static ChatRole ParseRole(string role) => role.ToLowerInvariant() switch
+        private async Task<List<ChatMessage>> BuildHistoryAsync(List<ChatMessageDto> messages)
+        {
+            var history = new List<ChatMessage>();
+
+            foreach (var m in messages)
+            {
+                if (m is null)
+                {
+                    throw new ArgumentException("Each message is required.", nameof(messages));
+                }
+
+                var role = ParseRole(m.Role);
+                var text = m.Text ?? string.Empty;
+
+                if (!string.IsNullOrWhiteSpace(m.FileData) && !string.IsNullOrWhiteSpace(m.FileName))
+                {
+                    var fileName = m.FileName;
+                    var fileData = m.FileData;
+                    var ext = Path.GetExtension(fileName).ToLowerInvariant();
+
+                    if (ImageExtensions.Contains(ext))
+                    {
+                        var contents = new List<AIContent>();
+                        if (!string.IsNullOrWhiteSpace(text))
+                        {
+                            contents.Add(new TextContent(text));
+                        }
+
+                        var bytes = Convert.FromBase64String(fileData);
+                        contents.Add(new DataContent(bytes, GetImageMimeType(ext)) { Name = fileName });
+                        history.Add(new ChatMessage(role, contents));
+                    }
+                    else
+                    {
+                        var fileText = await ParseFileContent(fileName, fileData);
+                        var combinedText = string.IsNullOrWhiteSpace(text)
+                            ? $"[Attached file: {fileName}]\n\n{fileText}"
+                            : $"{text}\n\n[Attached file: {fileName}]\n\n{fileText}";
+                        history.Add(new ChatMessage(role, combinedText));
+                    }
+                }
+                else
+                {
+                    history.Add(new ChatMessage(role, text));
+                }
+            }
+
+            return history;
+        }
+
+        private static ChatRole ParseRole(string? role) => role?.ToLowerInvariant() switch
         {
             "assistant" => ChatRole.Assistant,
             "system" => ChatRole.System,
             _ => ChatRole.User
+        };
+
+        private static string GetImageMimeType(string extension) => extension switch
+        {
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".gif" => "image/gif",
+            ".webp" => "image/webp",
+            _ => "image/png"
         };
 
         private async Task<string> ParseFileContent(string fileName, string fileData)

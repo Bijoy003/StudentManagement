@@ -5,6 +5,7 @@ using OpenAI;
 using OpenAI.Chat;
 using OpenAI.Embeddings;
 using StudentManagement.Application.Configuration;
+using StudentManagement.Application.Interfaces;
 using StudentManagement.Application.Services;
 using System.ClientModel;
 
@@ -21,27 +22,20 @@ public static class ChatClientServiceCollectionExtensions
         services.AddSingleton<McpToolProvider>();
         services.AddSingleton<IMcpToolProvider>(sp => sp.GetRequiredService<McpToolProvider>());
 
+        // Fail at startup on an unknown/misconfigured provider instead of on the first chat request.
+        configuration.GetSection(ChatOptions.SectionName).Get<ChatOptions>()?.Validate();
+
         services.AddChatClient(serviceProvider =>
         {
             var options = serviceProvider.GetRequiredService<IOptions<ChatOptions>>().Value;
-            var endpoint = options.Endpoint;
-            if (!endpoint.EndsWith("/v1", StringComparison.OrdinalIgnoreCase))
-            {
-                endpoint = $"{endpoint.TrimEnd('/')}/v1";
-            }
-
-            var clientOptions = new OpenAIClientOptions
-            {
-                Endpoint = new Uri(endpoint),
-                NetworkTimeout = TimeSpan.FromMinutes(5)
-            };
+            var provider = options.ResolveChatProvider();
 
             return new ChatClient(
-                options.Model,
+                provider.Model,
                 // Local/Ollama-style endpoints need no key, but ApiKeyCredential rejects
                 // empty strings; fall back to the same placeholder appsettings.json uses.
-                new ApiKeyCredential(string.IsNullOrWhiteSpace(options.ApiKey) ? "unused" : options.ApiKey),
-                clientOptions)
+                CreateCredential(provider.ApiKey),
+                CreateClientOptions(provider.Endpoint))
                 .AsIChatClient();
         })
         .UseFunctionInvocation()
@@ -51,24 +45,16 @@ public static class ChatClientServiceCollectionExtensions
         {
             var chatOptions = serviceProvider.GetRequiredService<IOptions<ChatOptions>>().Value;
             var features = serviceProvider.GetRequiredService<IOptions<ChatFeatureOptions>>().Value;
-            var endpoint = chatOptions.Endpoint;
-            if (!endpoint.EndsWith("/v1", StringComparison.OrdinalIgnoreCase))
-            {
-                endpoint = $"{endpoint.TrimEnd('/')}/v1";
-            }
-
-            var clientOptions = new OpenAIClientOptions
-            {
-                Endpoint = new Uri(endpoint),
-                NetworkTimeout = TimeSpan.FromMinutes(5)
-            };
+            // Embeddings can stay on a local provider (e.g. Ollama) while chat points at an
+            // API-key provider; Chat:EmbeddingProvider defaults to Chat:ActiveProvider.
+            var provider = chatOptions.ResolveEmbeddingProvider();
 
             return new EmbeddingClient(
                 features.EmbeddingModel,
-                // Same placeholder fallback as the ChatClient above: an empty Chat:ApiKey
-                // must not throw at DI-resolution time (it 500s every /Chat request).
-                new ApiKeyCredential(string.IsNullOrWhiteSpace(chatOptions.ApiKey) ? "unused" : chatOptions.ApiKey),
-                clientOptions)
+                // Same placeholder fallback as the ChatClient above: an empty key in the
+                // embedding profile must not throw at DI-resolution time (it 500s every /Chat request).
+                CreateCredential(provider.ApiKey),
+                CreateClientOptions(provider.Endpoint))
                 .AsIEmbeddingGenerator();
         });
 
@@ -88,6 +74,7 @@ public static class ChatClientServiceCollectionExtensions
         });
 
         services.AddSingleton<SemanticChunker>();
+        services.AddSingleton<IVectorStore, ChromaVectorStore>();
 
         services.AddSingleton<IDocumentParser, TxtDocumentParser>();
         services.AddSingleton<IDocumentParser, DocxDocumentParser>();
@@ -96,4 +83,23 @@ public static class ChatClientServiceCollectionExtensions
 
         return services;
     }
+
+    internal static OpenAIClientOptions CreateClientOptions(string endpoint)
+    {
+        var normalized = endpoint.EndsWith("/v1", StringComparison.OrdinalIgnoreCase)
+            ? endpoint
+            : $"{endpoint.TrimEnd('/')}/v1";
+
+        return new OpenAIClientOptions
+        {
+            Endpoint = new Uri(normalized),
+            NetworkTimeout = TimeSpan.FromMinutes(5)
+        };
+    }
+
+    internal static string NormalizeApiKey(string? apiKey) =>
+        string.IsNullOrWhiteSpace(apiKey) ? "unused" : apiKey!;
+
+    private static ApiKeyCredential CreateCredential(string apiKey) =>
+        new(NormalizeApiKey(apiKey));
 }

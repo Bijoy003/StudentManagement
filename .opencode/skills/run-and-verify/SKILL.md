@@ -30,7 +30,7 @@ App listens on the ports in `Properties/launchSettings.json` (Kestrel).
 
 **Prerequisites for full functionality:**
 - **SQL Server** with the `ConnectionStrings:DatabaseConnection` (see `appsettings.json`). Startup runs `MigrateAsync()` + `SeedAdmin` with 10 retries / 5s — DB must be reachable or the app exits.
-- **Ollama** running at `Chat:Endpoint` (`http://localhost:11434`) with the model in `Chat:Model` (default `qwen2.5:3b-instruct`). Not required to boot the app, only for chat.
+- **A chat provider** reachable at the active `Chat:Providers:<name>` profile (or the flat `Chat:Endpoint` when `Chat:ActiveProvider` is empty) — default is Ollama at `http://localhost:11434` with `qwen2.5:3b-instruct`. An API-key provider is selected with `Chat:ActiveProvider` (+ key in user-secrets); switching requires an app restart. Not required to boot the app, only for chat.
 - **ChromaDB** at `Chroma:Endpoint` (`http://localhost:8000`) for RAG. Not required to boot, only for RAG retrieval.
 - **MCP Jira server** (`Chat:Mcp`) — enabled only in Development (`appsettings.Development.json`). Disabled in Production.
 
