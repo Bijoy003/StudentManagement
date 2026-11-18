@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -151,5 +152,24 @@ public class EnrollmentControllerTests
         // Assert
         Assert.True(result);
         enrollments.Verify(e => e.DeleteEnrollment(10), Times.Once);
+    }
+
+    [Fact]
+    public async Task Save_CourseFull_ReturnsBadRequestWithMessage()
+    {
+        // Arrange — the service enforces the admin-set capacity; the MVC surface must
+        // surface it as the same 400 { Message } shape as other validation failures
+        var enrollments = new Mock<IEnrollmentService>();
+        enrollments.Setup(e => e.SaveEnrollment(It.IsAny<Enrollment>()))
+            .ThrowsAsync(new ValidationException("Course 'Algebra' is full."));
+        var controller = CreateController(enrollments, CoursesWithOwners());
+
+        // Act
+        var result = await controller.Save(new Enrollment { Id = 0, StudentId = 7, CourseId = 1 });
+
+        // Assert
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        var message = badRequest.Value?.GetType().GetProperty("Message")?.GetValue(badRequest.Value) as string;
+        Assert.Equal("Course 'Algebra' is full.", message);
     }
 }

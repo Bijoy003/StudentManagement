@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StudentManagement.Application.Interfaces;
@@ -23,10 +24,12 @@ public class StudentControllerTests
     private static StudentController CreateController(
         Mock<IStudentService> service,
         Mock<IEnrollmentService>? enrollmentService = null,
-        Mock<UserManager<ApplicationUser>>? userManager = null) =>
+        Mock<UserManager<ApplicationUser>>? userManager = null,
+        Mock<ICourseService>? courseService = null) =>
         new(
             service.Object,
             (enrollmentService ?? new Mock<IEnrollmentService>()).Object,
+            (courseService ?? new Mock<ICourseService>()).Object,
             (userManager ?? CreateUserManager()).Object,
             NullLogger<StudentController>.Instance);
 
@@ -129,5 +132,217 @@ public class StudentControllerTests
         var enrollment = Assert.Single(model);
         Assert.Equal("Math", enrollment.Course.Name);
         Assert.Equal("Linked Student", view.ViewData["StudentName"]);
+    }
+
+    private static void SetupTempData(StudentController controller) =>
+        controller.TempData = new TempDataDictionary(new DefaultHttpContext(), Mock.Of<ITempDataProvider>());
+
+    private static Mock<UserManager<ApplicationUser>> LinkedUserManager(int studentId)
+    {
+        var userManager = CreateUserManager();
+        userManager.Setup(manager => manager.GetUserAsync(It.IsAny<ClaimsPrincipal>()))
+            .ReturnsAsync(new ApplicationUser { FullName = "Linked Student", StudentId = studentId });
+        return userManager;
+    }
+
+    [Fact]
+    public async Task Enroll_UnlinkedAccount_RedirectsToMyCoursesWithoutSaving()
+    {
+        // Arrange — Student-role account with no student record link
+        var userManager = CreateUserManager();
+        userManager.Setup(manager => manager.GetUserAsync(It.IsAny<ClaimsPrincipal>()))
+            .ReturnsAsync(new ApplicationUser { FullName = "Unlinked Student" });
+        var enrollmentService = new Mock<IEnrollmentService>();
+        var controller = CreateController(new Mock<IStudentService>(), enrollmentService, userManager);
+        SignInAs(controller, "unlinked@example.com");
+        SetupTempData(controller);
+
+        // Act
+        var result = await controller.Enroll(3);
+
+        // Assert
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("MyCourses", redirect.ActionName);
+        enrollmentService.Verify(s => s.SaveEnrollment(It.IsAny<Enrollment>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Enroll_UnknownCourse_ReturnsNotFoundWithoutSaving()
+    {
+        // Arrange
+        var courseService = new Mock<ICourseService>();
+        courseService.Setup(s => s.GetCourseById(99)).ReturnsAsync((Course?)null);
+        var enrollmentService = new Mock<IEnrollmentService>();
+        var controller = CreateController(
+            new Mock<IStudentService>(), enrollmentService, LinkedUserManager(7), courseService);
+        SignInAs(controller, "linked@example.com");
+        SetupTempData(controller);
+
+        // Act
+        var result = await controller.Enroll(99);
+
+        // Assert
+        Assert.IsType<NotFoundResult>(result);
+        enrollmentService.Verify(s => s.SaveEnrollment(It.IsAny<Enrollment>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Enroll_AlreadyEnrolled_RedirectsToCourseIndexWithError()
+    {
+        // Arrange
+        var courseService = new Mock<ICourseService>();
+        courseService.Setup(s => s.GetCourseById(3))
+            .ReturnsAsync(new Course { Id = 3, Name = "Physics", Credits = 4 });
+        var enrollmentService = new Mock<IEnrollmentService>();
+        enrollmentService.Setup(s => s.IsStudentEnrolledInCourseAsync(7, 3)).ReturnsAsync(true);
+        var controller = CreateController(
+            new Mock<IStudentService>(), enrollmentService, LinkedUserManager(7), courseService);
+        SignInAs(controller, "linked@example.com");
+        SetupTempData(controller);
+
+        // Act
+        var result = await controller.Enroll(3);
+
+        // Assert
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Equal("Course", redirect.ControllerName);
+        Assert.NotNull(controller.TempData["Error"]);
+        enrollmentService.Verify(s => s.SaveEnrollment(It.IsAny<Enrollment>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Enroll_CourseFull_RedirectsToCourseIndexWithServiceMessage()
+    {
+        // Arrange — the service enforces the admin-set capacity and throws
+        var courseService = new Mock<ICourseService>();
+        courseService.Setup(s => s.GetCourseById(3))
+            .ReturnsAsync(new Course { Id = 3, Name = "Physics", Credits = 4, MaxEnrollments = 1 });
+        var enrollmentService = new Mock<IEnrollmentService>();
+        enrollmentService.Setup(s => s.IsStudentEnrolledInCourseAsync(7, 3)).ReturnsAsync(false);
+        enrollmentService.Setup(s => s.SaveEnrollment(It.IsAny<Enrollment>()))
+            .ThrowsAsync(new ValidationException("Course 'Physics' is full."));
+        var controller = CreateController(
+            new Mock<IStudentService>(), enrollmentService, LinkedUserManager(7), courseService);
+        SignInAs(controller, "linked@example.com");
+        SetupTempData(controller);
+
+        // Act
+        var result = await controller.Enroll(3);
+
+        // Assert
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+        Assert.Equal("Course", redirect.ControllerName);
+        Assert.Equal("Course 'Physics' is full.", controller.TempData["Error"]);
+    }
+
+    [Fact]
+    public async Task Enroll_LinkedUser_SavesEnrollmentWithAccountStudentIdAndRedirects()
+    {
+        // Arrange — the student id must come from the account link, never the request
+        var courseService = new Mock<ICourseService>();
+        courseService.Setup(s => s.GetCourseById(3))
+            .ReturnsAsync(new Course { Id = 3, Name = "Physics", Credits = 4 });
+        var enrollmentService = new Mock<IEnrollmentService>();
+        enrollmentService.Setup(s => s.IsStudentEnrolledInCourseAsync(7, 3)).ReturnsAsync(false);
+        enrollmentService.Setup(s => s.SaveEnrollment(It.IsAny<Enrollment>())).Returns(Task.CompletedTask);
+        var controller = CreateController(
+            new Mock<IStudentService>(), enrollmentService, LinkedUserManager(7), courseService);
+        SignInAs(controller, "linked@example.com");
+        SetupTempData(controller);
+
+        // Act
+        var result = await controller.Enroll(3);
+
+        // Assert
+        enrollmentService.Verify(s => s.SaveEnrollment(It.Is<Enrollment>(e =>
+            e.Id == 0 && e.StudentId == 7 && e.CourseId == 3 && e.Grade == null)), Times.Once);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("MyCourses", redirect.ActionName);
+        Assert.NotNull(controller.TempData["Success"]);
+    }
+
+    [Fact]
+    public async Task Drop_UnlinkedAccount_RedirectsToMyCoursesWithoutDeleting()
+    {
+        // Arrange
+        var userManager = CreateUserManager();
+        userManager.Setup(manager => manager.GetUserAsync(It.IsAny<ClaimsPrincipal>()))
+            .ReturnsAsync(new ApplicationUser { FullName = "Unlinked Student" });
+        var enrollmentService = new Mock<IEnrollmentService>();
+        var controller = CreateController(new Mock<IStudentService>(), enrollmentService, userManager);
+        SignInAs(controller, "unlinked@example.com");
+        SetupTempData(controller);
+
+        // Act
+        var result = await controller.Drop(10);
+
+        // Assert
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("MyCourses", redirect.ActionName);
+        enrollmentService.Verify(s => s.DeleteEnrollment(It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Drop_MissingEnrollment_ReturnsNotFoundWithoutDeleting()
+    {
+        // Arrange
+        var enrollmentService = new Mock<IEnrollmentService>();
+        enrollmentService.Setup(s => s.GetEnrollmentById(99)).ReturnsAsync((Enrollment?)null);
+        var controller = CreateController(
+            new Mock<IStudentService>(), enrollmentService, LinkedUserManager(7));
+        SignInAs(controller, "linked@example.com");
+        SetupTempData(controller);
+
+        // Act
+        var result = await controller.Drop(99);
+
+        // Assert
+        Assert.IsType<NotFoundResult>(result);
+        enrollmentService.Verify(s => s.DeleteEnrollment(It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Drop_AnotherStudentsEnrollment_ReturnsNotFoundWithoutDeleting()
+    {
+        // Arrange — enrollment 10 belongs to student 8, the account is linked to student 7
+        var enrollmentService = new Mock<IEnrollmentService>();
+        enrollmentService.Setup(s => s.GetEnrollmentById(10))
+            .ReturnsAsync(new Enrollment { Id = 10, StudentId = 8, CourseId = 3 });
+        var controller = CreateController(
+            new Mock<IStudentService>(), enrollmentService, LinkedUserManager(7));
+        SignInAs(controller, "linked@example.com");
+        SetupTempData(controller);
+
+        // Act
+        var result = await controller.Drop(10);
+
+        // Assert
+        Assert.IsType<NotFoundResult>(result);
+        enrollmentService.Verify(s => s.DeleteEnrollment(It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Drop_OwnEnrollment_DeletesAndRedirectsToMyCourses()
+    {
+        // Arrange
+        var enrollmentService = new Mock<IEnrollmentService>();
+        enrollmentService.Setup(s => s.GetEnrollmentById(10))
+            .ReturnsAsync(new Enrollment { Id = 10, StudentId = 7, CourseId = 3 });
+        enrollmentService.Setup(s => s.DeleteEnrollment(10)).Returns(Task.CompletedTask);
+        var controller = CreateController(
+            new Mock<IStudentService>(), enrollmentService, LinkedUserManager(7));
+        SignInAs(controller, "linked@example.com");
+        SetupTempData(controller);
+
+        // Act
+        var result = await controller.Drop(10);
+
+        // Assert
+        enrollmentService.Verify(s => s.DeleteEnrollment(10), Times.Once);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("MyCourses", redirect.ActionName);
+        Assert.NotNull(controller.TempData["Success"]);
     }
 }

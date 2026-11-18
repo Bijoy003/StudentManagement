@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using StudentManagement.Application.Authorization;
+using System.ComponentModel.DataAnnotations;
 
 namespace StudentManagement.Web.Controllers
 {
@@ -93,6 +94,12 @@ namespace StudentManagement.Web.Controllers
 
                 await _enrollmentService.SaveEnrollment(enrollment);
                 return Ok(true);
+            }
+            catch (ValidationException ex)
+            {
+                // Domain validation (e.g. the admin-set course capacity) uses the same
+                // 400 { Message } shape as ModelState failures.
+                return BadRequest(new { Message = ex.Message });
             }
             catch (Exception ex)
             {

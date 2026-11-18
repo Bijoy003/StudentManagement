@@ -13,6 +13,9 @@ namespace StudentManagement.Domain.Interfaces
         Task DeleteAsync(int id);
         Task SaveChangesAsync();
 
+        Task<Enrollment?> GetByStudentAndCourseAsyncReadOnly(int studentId, int courseId);
+        Task<int> CountByCourseIdAsyncReadOnly(int courseId);
+
         Task<IEnumerable<Enrollment>> GetByCourseIdAsync(int courseId);
         Task<IEnumerable<Enrollment>> GetByCourseIdAsyncReadOnly(int courseId);
         Task<List<Enrollment>> GetByCourseIdWithStudentAsyncReadOnly(int courseId);

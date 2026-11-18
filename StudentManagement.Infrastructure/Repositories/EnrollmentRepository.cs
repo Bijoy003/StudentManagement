@@ -66,6 +66,20 @@ namespace StudentManagement.Infrastructure.Repositories
             await _dbContext.SaveChangesAsync();
         }
 
+        public async Task<Enrollment?> GetByStudentAndCourseAsyncReadOnly(int studentId, int courseId)
+        {
+            return await _readOnlyDbContext.Enrollments
+                .AsNoTracking()
+                .FirstOrDefaultAsync(e => e.StudentId == studentId && e.CourseId == courseId);
+        }
+
+        public async Task<int> CountByCourseIdAsyncReadOnly(int courseId)
+        {
+            return await _readOnlyDbContext.Enrollments
+                .AsNoTracking()
+                .CountAsync(e => e.CourseId == courseId);
+        }
+
         public async Task<IEnumerable<Enrollment>> GetByCourseIdAsync(int courseId)
         {
             return await _dbContext.Enrollments

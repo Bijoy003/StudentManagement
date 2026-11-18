@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using StudentManagement.Application.Authorization;
+using StudentManagement.Infrastructure.Data;
 
 namespace StudentManagement.Web.Controllers
 {
@@ -10,11 +12,19 @@ namespace StudentManagement.Web.Controllers
     public class CourseController : Controller
     {
         private readonly ICourseService _courseService;
+        private readonly IEnrollmentService _enrollmentService;
+        private readonly UserManager<ApplicationUser> _userManager;
         private readonly ILogger<CourseController> _logger;
 
-        public CourseController(ICourseService service, ILogger<CourseController> logger)
+        public CourseController(
+            ICourseService service,
+            IEnrollmentService enrollmentService,
+            UserManager<ApplicationUser> userManager,
+            ILogger<CourseController> logger)
         {
             _courseService = service;
+            _enrollmentService = enrollmentService;
+            _userManager = userManager;
             _logger = logger;
         }
 
@@ -27,6 +37,35 @@ namespace StudentManagement.Web.Controllers
             try
             {
                 var courses = await _courseService.GetAllCourses();
+
+                // Student catalog: mark the account's own enrollments and the full courses
+                // so the view can offer Enroll / show Enrolled / Full. Staff stays unchanged.
+                if (User.IsInRole(AppRoles.Student))
+                {
+                    var enrolledCourseIds = new HashSet<int>();
+                    var fullCourseIds = new HashSet<int>();
+                    var user = await _userManager.GetUserAsync(User);
+                    if (user?.StudentId is int studentId)
+                    {
+                        var enrollments = (await _enrollmentService.GetEnrollments()).ToList();
+                        enrolledCourseIds = enrollments
+                            .Where(enrollment => enrollment.StudentId == studentId)
+                            .Select(enrollment => enrollment.CourseId)
+                            .ToHashSet();
+                        var counts = enrollments
+                            .GroupBy(enrollment => enrollment.CourseId)
+                            .ToDictionary(group => group.Key, group => group.Count());
+                        fullCourseIds = courses
+                            .Where(course => course.MaxEnrollments is int limit
+                                && counts.TryGetValue(course.Id, out var count)
+                                && count >= limit)
+                            .Select(course => course.Id)
+                            .ToHashSet();
+                    }
+                    ViewBag.EnrolledCourseIds = enrolledCourseIds;
+                    ViewBag.FullCourseIds = fullCourseIds;
+                }
+
                 return View(courses);
             }
             catch (Exception ex)
@@ -86,11 +125,12 @@ namespace StudentManagement.Web.Controllers
                     return BadRequest(new { Message = firstError });
                 }
 
+                Course? persisted = null;
                 if (course.Id != 0)
                 {
                     // Ownership is checked against the persisted row, never the bound
                     // payload — a crafted TeacherId must not grant edit rights.
-                    var persisted = await _courseService.GetCourseById(course.Id);
+                    persisted = await _courseService.GetCourseById(course.Id);
                     if (persisted is null || !CanManageCourse(persisted))
                     {
                         return Forbid();
@@ -101,6 +141,13 @@ namespace StudentManagement.Web.Controllers
                 if (course.Id == 0 && !User.IsInRole(AppRoles.Admin))
                 {
                     course.TeacherId = User.Identity?.Name;
+                }
+
+                // The seat cap is admin-managed: strip it on teacher creates and restamp
+                // the persisted value on teacher edits so a payload cannot raise it.
+                if (!User.IsInRole(AppRoles.Admin))
+                {
+                    course.MaxEnrollments = persisted?.MaxEnrollments;
                 }
 
                 await _courseService.SaveCourse(course);

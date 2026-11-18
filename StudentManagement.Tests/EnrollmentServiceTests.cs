@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -341,16 +342,163 @@ public class EnrollmentServiceTests
         mockRepo.Verify(r => r.GetByCourseIdAsyncReadOnly(1), Times.Exactly(2));
     }
 
+    [Fact]
+    public async Task IsStudentEnrolledInCourseAsync_ExistingPair_ReturnsTrue()
+    {
+        // Arrange
+        var mockRepo = new Mock<IEnrollmentRepository>();
+        mockRepo.Setup(r => r.GetByStudentAndCourseAsyncReadOnly(7, 3))
+            .ReturnsAsync(new Enrollment { Id = 10, StudentId = 7, CourseId = 3 });
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = CreateService(mockRepo, memoryCache, CreateDistributedCacheMock());
+
+        // Act
+        var result = await service.IsStudentEnrolledInCourseAsync(7, 3);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public async Task IsStudentEnrolledInCourseAsync_MissingPair_ReturnsFalse()
+    {
+        // Arrange
+        var mockRepo = new Mock<IEnrollmentRepository>();
+        mockRepo.Setup(r => r.GetByStudentAndCourseAsyncReadOnly(7, 3))
+            .ReturnsAsync((Enrollment?)null);
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = CreateService(mockRepo, memoryCache, CreateDistributedCacheMock());
+
+        // Act
+        var result = await service.IsStudentEnrolledInCourseAsync(7, 3);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task SaveEnrollment_NewEnrollmentWhenCourseFull_ThrowsValidationException()
+    {
+        // Arrange — course 3 caps at 2 seats and already has 2
+        var mockRepo = new Mock<IEnrollmentRepository>();
+        mockRepo.Setup(r => r.CountByCourseIdAsyncReadOnly(3)).ReturnsAsync(2);
+        var courseRepo = new Mock<ICourseRepository>();
+        courseRepo.Setup(r => r.GetByIdAsyncReadOnly(3))
+            .ReturnsAsync(new Course { Id = 3, Name = "Physics", MaxEnrollments = 2 });
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = CreateService(mockRepo, memoryCache, CreateDistributedCacheMock(), courseRepo);
+
+        // Act / Assert
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            service.SaveEnrollment(new Enrollment { Id = 0, StudentId = 7, CourseId = 3 }));
+        mockRepo.Verify(r => r.AddAsync(It.IsAny<Enrollment>()), Times.Never);
+        mockRepo.Verify(r => r.SaveChangesAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task SaveEnrollment_NewEnrollmentUnderLimit_SavesEnrollment()
+    {
+        // Arrange — 1 seat taken of 2; the save must proceed AND consult the capacity
+        var mockRepo = new Mock<IEnrollmentRepository>();
+        mockRepo.Setup(r => r.CountByCourseIdAsyncReadOnly(3)).ReturnsAsync(1);
+        mockRepo.Setup(r => r.AddAsync(It.IsAny<Enrollment>())).Returns(Task.CompletedTask);
+        mockRepo.Setup(r => r.SaveChangesAsync()).Returns(Task.CompletedTask);
+        var courseRepo = new Mock<ICourseRepository>();
+        courseRepo.Setup(r => r.GetByIdAsyncReadOnly(3))
+            .ReturnsAsync(new Course { Id = 3, Name = "Physics", MaxEnrollments = 2 });
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = CreateService(mockRepo, memoryCache, CreateDistributedCacheMock(), courseRepo);
+
+        // Act
+        await service.SaveEnrollment(new Enrollment { Id = 0, StudentId = 7, CourseId = 3 });
+
+        // Assert
+        mockRepo.Verify(r => r.AddAsync(It.Is<Enrollment>(e => e.StudentId == 7 && e.CourseId == 3)), Times.Once);
+        mockRepo.Verify(r => r.SaveChangesAsync(), Times.Once);
+        courseRepo.Verify(r => r.GetByIdAsyncReadOnly(3), Times.Once);
+        mockRepo.Verify(r => r.CountByCourseIdAsyncReadOnly(3), Times.Once);
+    }
+
+    [Fact]
+    public async Task SaveEnrollment_NewEnrollmentWithNullLimit_SavesWithoutCounting()
+    {
+        // Arrange — null cap means unlimited; no seat count is needed
+        var mockRepo = new Mock<IEnrollmentRepository>();
+        mockRepo.Setup(r => r.AddAsync(It.IsAny<Enrollment>())).Returns(Task.CompletedTask);
+        mockRepo.Setup(r => r.SaveChangesAsync()).Returns(Task.CompletedTask);
+        var courseRepo = new Mock<ICourseRepository>();
+        courseRepo.Setup(r => r.GetByIdAsyncReadOnly(3))
+            .ReturnsAsync(new Course { Id = 3, Name = "Physics", MaxEnrollments = null });
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = CreateService(mockRepo, memoryCache, CreateDistributedCacheMock(), courseRepo);
+
+        // Act
+        await service.SaveEnrollment(new Enrollment { Id = 0, StudentId = 7, CourseId = 3 });
+
+        // Assert
+        mockRepo.Verify(r => r.AddAsync(It.IsAny<Enrollment>()), Times.Once);
+        courseRepo.Verify(r => r.GetByIdAsyncReadOnly(3), Times.Once);
+        mockRepo.Verify(r => r.CountByCourseIdAsyncReadOnly(It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SaveEnrollment_GradeUpdateOnFullCourse_SavesWithoutCapacityCheck()
+    {
+        // Arrange — same-course update is a grade edit, not a new seat; a full course
+        // must not block it. The persisted row is read to detect course moves.
+        var mockRepo = new Mock<IEnrollmentRepository>();
+        mockRepo.Setup(r => r.GetByIdAsyncReadOnly(10))
+            .ReturnsAsync(new Enrollment { Id = 10, StudentId = 7, CourseId = 3 });
+        mockRepo.Setup(r => r.SaveChangesAsync()).Returns(Task.CompletedTask);
+        var courseRepo = new Mock<ICourseRepository>();
+        courseRepo.Setup(r => r.GetByIdAsyncReadOnly(3))
+            .ReturnsAsync(new Course { Id = 3, Name = "Physics", MaxEnrollments = 2 });
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = CreateService(mockRepo, memoryCache, CreateDistributedCacheMock(), courseRepo);
+
+        // Act
+        await service.SaveEnrollment(new Enrollment { Id = 10, StudentId = 7, CourseId = 3, Grade = 90m });
+
+        // Assert
+        mockRepo.Verify(r => r.Update(It.Is<Enrollment>(e => e.Id == 10)), Times.Once);
+        mockRepo.Verify(r => r.SaveChangesAsync(), Times.Once);
+        mockRepo.Verify(r => r.GetByIdAsyncReadOnly(10), Times.Once);
+        mockRepo.Verify(r => r.CountByCourseIdAsyncReadOnly(It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SaveEnrollment_UpdateMovingToFullCourse_ThrowsValidationException()
+    {
+        // Arrange — enrollment 10 lives in course 2; the payload moves it into full course 3
+        var mockRepo = new Mock<IEnrollmentRepository>();
+        mockRepo.Setup(r => r.GetByIdAsyncReadOnly(10))
+            .ReturnsAsync(new Enrollment { Id = 10, StudentId = 7, CourseId = 2 });
+        mockRepo.Setup(r => r.CountByCourseIdAsyncReadOnly(3)).ReturnsAsync(2);
+        var courseRepo = new Mock<ICourseRepository>();
+        courseRepo.Setup(r => r.GetByIdAsyncReadOnly(3))
+            .ReturnsAsync(new Course { Id = 3, Name = "Physics", MaxEnrollments = 2 });
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = CreateService(mockRepo, memoryCache, CreateDistributedCacheMock(), courseRepo);
+
+        // Act / Assert
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            service.SaveEnrollment(new Enrollment { Id = 10, StudentId = 7, CourseId = 3 }));
+        mockRepo.Verify(r => r.Update(It.IsAny<Enrollment>()), Times.Never);
+        mockRepo.Verify(r => r.SaveChangesAsync(), Times.Never);
+    }
+
     private static EnrollmentService CreateService(
         Mock<IEnrollmentRepository> repository,
         IMemoryCache memoryCache,
-        Mock<IDistributedCache> distributedCache)
+        Mock<IDistributedCache> distributedCache,
+        Mock<ICourseRepository>? courseRepository = null)
     {
         return new EnrollmentService(
             repository.Object,
             memoryCache,
             distributedCache.Object,
-            NullLogger<EnrollmentService>.Instance);
+            NullLogger<EnrollmentService>.Instance,
+            courseRepository: courseRepository?.Object);
     }
 
     private static Mock<IDistributedCache> CreateDistributedCacheMock()

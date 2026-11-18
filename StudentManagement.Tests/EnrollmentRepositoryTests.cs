@@ -76,4 +76,92 @@ public class EnrollmentRepositoryTests
 
         await connection.CloseAsync();
     }
+
+    [Fact]
+    public async Task GetByStudentAndCourseAsyncReadOnly_MatchingPair_ReturnsEnrollment()
+    {
+        // Arrange
+        var connection = await CreateSeededDatabaseAsync();
+
+        using (var context = new ApplicationDbContext(CreateOptions(connection)))
+        using (var readOnlyContext = new ReadOnlyDbContext(CreateReadOnlyOptions(connection)))
+        {
+            var repository = new EnrollmentRepository(context, readOnlyContext);
+
+            // Act
+            var result = await repository.GetByStudentAndCourseAsyncReadOnly(1, 2);
+
+            // Assert — the (student 1, course 2) pair is enrollment 3, read untracked
+            Assert.NotNull(result);
+            Assert.Equal(3, result!.Id);
+            Assert.Equal(EntityState.Detached, readOnlyContext.Entry(result).State);
+        }
+
+        await connection.CloseAsync();
+    }
+
+    [Fact]
+    public async Task GetByStudentAndCourseAsyncReadOnly_WrongStudentOrCourse_ReturnsNull()
+    {
+        // Arrange
+        var connection = await CreateSeededDatabaseAsync();
+
+        using (var context = new ApplicationDbContext(CreateOptions(connection)))
+        using (var readOnlyContext = new ReadOnlyDbContext(CreateReadOnlyOptions(connection)))
+        {
+            var repository = new EnrollmentRepository(context, readOnlyContext);
+
+            // Act / Assert — both keys must match; unknown ids yield null
+            Assert.Null(await repository.GetByStudentAndCourseAsyncReadOnly(2, 2));
+            Assert.Null(await repository.GetByStudentAndCourseAsyncReadOnly(99, 1));
+            Assert.Null(await repository.GetByStudentAndCourseAsyncReadOnly(1, 99));
+        }
+
+        await connection.CloseAsync();
+    }
+
+    [Fact]
+    public async Task CountByCourseIdAsyncReadOnly_SeededEnrollments_ReturnsCountForCourseOnly()
+    {
+        // Arrange
+        var connection = await CreateSeededDatabaseAsync();
+
+        using (var context = new ApplicationDbContext(CreateOptions(connection)))
+        using (var readOnlyContext = new ReadOnlyDbContext(CreateReadOnlyOptions(connection)))
+        {
+            var repository = new EnrollmentRepository(context, readOnlyContext);
+
+            // Act / Assert — course 1 has two enrollments, course 2 one, course 99 none
+            Assert.Equal(2, await repository.CountByCourseIdAsyncReadOnly(1));
+            Assert.Equal(1, await repository.CountByCourseIdAsyncReadOnly(2));
+            Assert.Equal(0, await repository.CountByCourseIdAsyncReadOnly(99));
+        }
+
+        await connection.CloseAsync();
+    }
+
+    private static async Task<SqliteConnection> CreateSeededDatabaseAsync()
+    {
+        var connection = new SqliteConnection("Filename=:memory:");
+        await connection.OpenAsync();
+
+        using var context = new ApplicationDbContext(CreateOptions(connection));
+        await context.Database.EnsureCreatedAsync();
+
+        context.Students.AddRange(
+            new Student { Id = 1, Name = "Ada Lovelace", Email = "ada@example.com" },
+            new Student { Id = 2, Name = "Grace Hopper", Email = "grace@example.com" });
+        context.Courses.AddRange(
+            new Course { Id = 1, Name = "Algebra", Credits = 3, TeacherId = "teacher-a" },
+            new Course { Id = 2, Name = "Physics", Credits = 4, TeacherId = "teacher-b" });
+        await context.SaveChangesAsync();
+
+        context.Enrollments.AddRange(
+            new Enrollment { Id = 1, StudentId = 1, CourseId = 1 },
+            new Enrollment { Id = 2, StudentId = 2, CourseId = 1 },
+            new Enrollment { Id = 3, StudentId = 1, CourseId = 2 });
+        await context.SaveChangesAsync();
+
+        return connection;
+    }
 }

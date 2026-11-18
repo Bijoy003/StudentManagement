@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using StudentManagement.Application.Authorization;
+using StudentManagement.Domain.Entities;
 using StudentManagement.Infrastructure.Data;
 using System.ComponentModel.DataAnnotations;
 
@@ -12,17 +13,20 @@ namespace StudentManagement.Web.Controllers
     {
         private readonly IStudentService _studentService;
         private readonly IEnrollmentService _enrollmentService;
+        private readonly ICourseService _courseService;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ILogger<StudentController> _logger;
 
         public StudentController(
             IStudentService studentService,
             IEnrollmentService enrollmentService,
+            ICourseService courseService,
             UserManager<ApplicationUser> userManager,
             ILogger<StudentController> logger)
         {
             _studentService = studentService;
             _enrollmentService = enrollmentService;
+            _courseService = courseService;
             _userManager = userManager;
             _logger = logger;
         }
@@ -111,6 +115,86 @@ namespace StudentManagement.Web.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "An error occurred.");
+                return View("Error");
+            }
+        }
+
+        // Student self-service: enroll into a catalog course. The StudentId always comes
+        // from the account link (AspNetUsers.StudentId), never from the request.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Policy = Policies.StudentSelf)]
+        public async Task<IActionResult> Enroll(int courseId)
+        {
+            try
+            {
+                var user = await _userManager.GetUserAsync(User);
+                if (user?.StudentId is null)
+                {
+                    return RedirectToAction(nameof(MyCourses));
+                }
+
+                var course = await _courseService.GetCourseById(courseId);
+                if (course is null)
+                {
+                    return NotFound();
+                }
+
+                if (await _enrollmentService.IsStudentEnrolledInCourseAsync(user.StudentId.Value, courseId))
+                {
+                    TempData["Error"] = "You are already enrolled in this course.";
+                    return RedirectToAction("Index", "Course");
+                }
+
+                await _enrollmentService.SaveEnrollment(new Enrollment
+                {
+                    StudentId = user.StudentId.Value,
+                    CourseId = courseId
+                });
+
+                TempData["Success"] = $"Enrolled in {course.Name}.";
+                return RedirectToAction(nameof(MyCourses));
+            }
+            catch (ValidationException ex)
+            {
+                // Capacity (or other domain validation) failure: back to the catalog.
+                TempData["Error"] = ex.Message;
+                return RedirectToAction("Index", "Course");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while enrolling in course {CourseId}.", courseId);
+                return View("Error");
+            }
+        }
+
+        // Student self-service: drop one of OWN enrollments; ownership is checked server-side.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Policy = Policies.StudentSelf)]
+        public async Task<IActionResult> Drop(int enrollmentId)
+        {
+            try
+            {
+                var user = await _userManager.GetUserAsync(User);
+                if (user?.StudentId is null)
+                {
+                    return RedirectToAction(nameof(MyCourses));
+                }
+
+                var enrollment = await _enrollmentService.GetEnrollmentById(enrollmentId);
+                if (enrollment is null || enrollment.StudentId != user.StudentId.Value)
+                {
+                    return NotFound();
+                }
+
+                await _enrollmentService.DeleteEnrollment(enrollmentId);
+                TempData["Success"] = "Course dropped.";
+                return RedirectToAction(nameof(MyCourses));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while dropping enrollment {EnrollmentId}.", enrollmentId);
                 return View("Error");
             }
         }

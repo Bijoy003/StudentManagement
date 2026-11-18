@@ -26,6 +26,14 @@
         <select class="form-select" asp-for="GradeMode" id="grade-mode"
                 asp-items="@Html.GetEnumSelectList<GradeMode>()"></select>
     </div>
+    @if (User.IsInRole(AppRoles.Admin))
+    {
+        <div class="mb-3">
+            <label asp-for="MaxEnrollments" class="form-label">Maximum Enrollments</label>
+            <input type="number" min="1" class="form-control" asp-for="MaxEnrollments" id="max-enrollments" />
+            <div class="form-text">Leave empty for unlimited. Only admins can set the seat cap.</div>
+        </div>
+    }
     <button type="submit" class="btn btn-outline-success">Save</button>
     <a class="btn btn-outline-danger" href="@Url.Action("Index", "Course")">Cancel</a>
 </form>

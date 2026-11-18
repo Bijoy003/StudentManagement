@@ -13,6 +13,10 @@ namespace StudentManagement.Domain.Entities
 
         public int Credits { get; set; }
 
+        // Admin-managed seat cap; null means unlimited. Enforced on every enrollment write.
+        [Range(1, int.MaxValue, ErrorMessage = "Maximum enrollments must be at least 1")]
+        public int? MaxEnrollments { get; set; }
+
         public GradeMode GradeMode { get; set; } = GradeMode.Letter;
 
         public string? TeacherId { get; set; }

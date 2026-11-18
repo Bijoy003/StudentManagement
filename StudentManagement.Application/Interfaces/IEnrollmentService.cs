@@ -8,6 +8,7 @@ namespace StudentManagement.Application.Interfaces
         Task<Enrollment?> GetEnrollmentById(int id);
         Task SaveEnrollment(Enrollment enrollment);
         Task DeleteEnrollment(int id);
+        Task<bool> IsStudentEnrolledInCourseAsync(int studentId, int courseId);
         Task<IEnumerable<Enrollment>> GetEnrollmentsByCourse(int courseId);
         Task<List<Student>> GetStudentsInCourse(int courseId);
         Task<List<Course>> GetCoursesForStudent(int studentId);

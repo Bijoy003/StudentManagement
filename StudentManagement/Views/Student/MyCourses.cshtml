@@ -13,6 +13,15 @@
 <h2>My Courses</h2>
 <p class="text-muted">Signed in as @ViewBag.StudentName</p>
 
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
+
 @if (Model != null && Model.Any())
 {
     <table class="table table-bordered">
@@ -21,6 +30,7 @@
                 <th>Course</th>
                 <th>Credits</th>
                 <th>Grade</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -39,6 +49,14 @@
                             <span class="text-muted">Not graded</span>
                         }
                     </td>
+                    <td>
+                        <form asp-controller="Student" asp-action="Drop" method="post" class="d-inline"
+                              onsubmit="return confirm('Drop this course?');">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="enrollmentId" value="@enrollment.Id" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Drop</button>
+                        </form>
+                    </td>
                 </tr>
             }
         </tbody>
@@ -48,3 +66,5 @@ else
 {
     <div class="alert alert-info">You are not enrolled in any courses yet.</div>
 }
+
+<a class="btn btn-outline-primary" href="@Url.Action("Index", "Course")">Browse Courses</a>

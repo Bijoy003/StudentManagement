@@ -33,7 +33,7 @@
         },
         error: function (xhr, status, error) {
             console.error(error);
-            alert('AJAX error: ' + error);
+            alert(xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'AJAX error: ' + error);
         }
     });
 }

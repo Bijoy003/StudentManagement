@@ -5,6 +5,7 @@ using StudentManagement.Application.Interfaces;
 using StudentManagement.Domain.Entities;
 using StudentManagement.Domain.Events;
 using StudentManagement.Domain.Interfaces;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 
 namespace StudentManagement.Application.Services
@@ -25,6 +26,7 @@ namespace StudentManagement.Application.Services
         // Optional so the legacy 4-arg construction (existing tests) stays source-compatible.
         private readonly IDomainEventDispatcher? _domainEventDispatcher;
         private readonly IEnumerable<IGradingStrategy>? _gradingStrategies;
+        private readonly ICourseRepository? _courseRepository;
 
         public EnrollmentService(
             IEnrollmentRepository repo,
@@ -32,7 +34,8 @@ namespace StudentManagement.Application.Services
             IDistributedCache distributedCache,
             ILogger<EnrollmentService> logger,
             IDomainEventDispatcher? domainEventDispatcher = null,
-            IEnumerable<IGradingStrategy>? gradingStrategies = null)
+            IEnumerable<IGradingStrategy>? gradingStrategies = null,
+            ICourseRepository? courseRepository = null)
         {
             _enrollmentRepository = repo;
             _memoryCache = memoryCache;
@@ -40,6 +43,7 @@ namespace StudentManagement.Application.Services
             _logger = logger;
             _domainEventDispatcher = domainEventDispatcher;
             _gradingStrategies = gradingStrategies;
+            _courseRepository = courseRepository;
         }
 
         public IGradingStrategy GetGradingStrategy(GradeMode gradeMode) =>
@@ -85,6 +89,7 @@ namespace StudentManagement.Application.Services
         public async Task SaveEnrollment(Enrollment enrollment)
         {
             var isNew = enrollment.Id == 0;
+            await EnsureCapacityAsync(enrollment, isNew);
             if (isNew)
             {
                 await _enrollmentRepository.AddAsync(enrollment);
@@ -125,6 +130,12 @@ namespace StudentManagement.Application.Services
                 await _domainEventDispatcher.DispatchAsync(
                     new EnrollmentDeletedEvent(id, enrollment.CourseId, enrollment.StudentId));
             }
+        }
+
+        public async Task<bool> IsStudentEnrolledInCourseAsync(int studentId, int courseId)
+        {
+            // Fresh read, never cached: this guards a write that is about to happen.
+            return await _enrollmentRepository.GetByStudentAndCourseAsyncReadOnly(studentId, courseId) is not null;
         }
 
         public async Task<IEnumerable<Enrollment>> GetEnrollmentsByCourse(int courseId)
@@ -173,6 +184,38 @@ namespace StudentManagement.Application.Services
             var courses = await _enrollmentRepository.GetCoursesByStudentAsyncReadOnly(studentId);
             _memoryCache.Set(cacheKey, JsonSerializer.Serialize(courses), CacheDuration);
             return courses;
+        }
+
+        // The admin-set seat cap guards every write that ADDS a seat: new enrollments and
+        // updates that move an enrollment into another course. Same-course grade edits are
+        // exempt. Skipped only for legacy constructions without a course repository.
+        private async Task EnsureCapacityAsync(Enrollment enrollment, bool isNew)
+        {
+            if (_courseRepository is null)
+            {
+                return;
+            }
+
+            if (!isNew)
+            {
+                var persisted = await _enrollmentRepository.GetByIdAsyncReadOnly(enrollment.Id);
+                if (persisted is not null && persisted.CourseId == enrollment.CourseId)
+                {
+                    return;
+                }
+            }
+
+            var course = await _courseRepository.GetByIdAsyncReadOnly(enrollment.CourseId);
+            if (course?.MaxEnrollments is not int limit)
+            {
+                return;
+            }
+
+            var count = await _enrollmentRepository.CountByCourseIdAsyncReadOnly(enrollment.CourseId);
+            if (count >= limit)
+            {
+                throw new ValidationException($"Course '{course.Name}' is full ({limit} seats).");
+            }
         }
 
         private async Task InvalidateCacheAsync(int id, int? courseId = null, int? studentId = null)

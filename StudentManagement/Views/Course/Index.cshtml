@@ -7,6 +7,15 @@
 
 <h3>Courses</h3>
 
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
+
 <div class="mb-3 d-flex gap-2">
     @if (User.IsInRole(AppRoles.Admin) || User.IsInRole(AppRoles.Teacher))
     {
@@ -19,14 +28,47 @@
     </a>
 </div>
 
+@{
+    var isStudent = User.IsInRole(AppRoles.Student);
+    var enrolledCourseIds = ViewBag.EnrolledCourseIds as HashSet<int> ?? new HashSet<int>();
+    var fullCourseIds = ViewBag.FullCourseIds as HashSet<int> ?? new HashSet<int>();
+}
+
 <table class="table table-striped">
-    <tr><th>ID</th><th>Name</th><th>Credits</th></tr>
+    <tr>
+        <th>ID</th><th>Name</th><th>Credits</th>
+        @if (isStudent)
+        {
+            <th>Enrollment</th>
+        }
+    </tr>
     @foreach (var c in Model)
     {
         <tr>
             <td>@c.Id</td>
             <td>@c.Name</td>
             <td>@c.Credits</td>
+            @if (isStudent)
+            {
+                <td>
+                    @if (enrolledCourseIds.Contains(c.Id))
+                    {
+                        <span class="badge bg-success">Enrolled</span>
+                    }
+                    else if (fullCourseIds.Contains(c.Id))
+                    {
+                        <span class="badge bg-secondary">Full</span>
+                    }
+                    else
+                    {
+                        <form asp-controller="Student" asp-action="Enroll" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="courseId" value="@c.Id" />
+                            <button type="submit" class="btn btn-sm btn-outline-primary">Enroll</button>
+                        </form>
+                    }
+                </td>
+            }
         </tr>
     }
 </table>

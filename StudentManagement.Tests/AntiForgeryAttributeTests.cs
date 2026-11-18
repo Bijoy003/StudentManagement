@@ -1,5 +1,7 @@
 using System.Reflection;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using StudentManagement.Application.Authorization;
 using StudentManagement.Web.Controllers;
 
 namespace StudentManagement.Tests;
@@ -65,5 +67,35 @@ public class AntiForgeryAttributeTests
         {
             Assert.Contains(name, protectedPosts);
         }
+    }
+
+    [Fact]
+    public void Enroll_WhenInspected_ReturnsHttpPostWithValidateAntiForgeryTokenAndStudentSelfPolicy()
+    {
+        // Arrange
+        var action = typeof(StudentController).GetMethod("Enroll");
+        Assert.NotNull(action);
+
+        // Act / Assert — student self-enroll is a token-protected POST gated to Student role
+        Assert.NotNull(action!.GetCustomAttribute<HttpPostAttribute>());
+        Assert.NotNull(action.GetCustomAttribute<ValidateAntiForgeryTokenAttribute>());
+        var authorize = action.GetCustomAttribute<AuthorizeAttribute>();
+        Assert.NotNull(authorize);
+        Assert.Equal(Policies.StudentSelf, authorize!.Policy);
+    }
+
+    [Fact]
+    public void Drop_WhenInspected_ReturnsHttpPostWithValidateAntiForgeryTokenAndStudentSelfPolicy()
+    {
+        // Arrange
+        var action = typeof(StudentController).GetMethod("Drop");
+        Assert.NotNull(action);
+
+        // Act / Assert — dropping is a token-protected POST gated to Student role
+        Assert.NotNull(action!.GetCustomAttribute<HttpPostAttribute>());
+        Assert.NotNull(action.GetCustomAttribute<ValidateAntiForgeryTokenAttribute>());
+        var authorize = action.GetCustomAttribute<AuthorizeAttribute>();
+        Assert.NotNull(authorize);
+        Assert.Equal(Policies.StudentSelf, authorize!.Policy);
     }
 }

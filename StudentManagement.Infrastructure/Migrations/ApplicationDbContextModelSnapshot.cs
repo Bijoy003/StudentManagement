@@ -235,6 +235,9 @@ namespace StudentManagement.Migrations
                     b.Property<int>("GradeMode")
                         .HasColumnType("int");
 
+                    b.Property<int?>("MaxEnrollments")
+                        .HasColumnType("int");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
