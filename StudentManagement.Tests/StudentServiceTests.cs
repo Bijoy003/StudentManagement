@@ -90,6 +90,80 @@ namespace StudentManagement.Tests
 
             Assert.Equal("John", result?.Name);
         }
+
+        [Fact]
+        public async Task SaveStudentAsync_ExistingStudent_UpdatesAndInvalidatesCaches()
+        {
+            // Arrange — Id set means the row already exists, so the update path must be used
+            var mockStudentRepo = new Mock<IStudentRepository>();
+            var mockEnrollmentRepo = new Mock<IEnrollmentRepository>();
+            var mockCache = new Mock<IDistributedCache>();
+
+            Student? updated = null;
+            mockStudentRepo.Setup(r => r.Update(It.IsAny<Student>())).Callback<Student>(s => updated = s);
+
+            var service = new StudentService(mockStudentRepo.Object, mockEnrollmentRepo.Object, mockCache.Object, NullLogger<StudentService>.Instance);
+            var student = new Student { Id = 7, Name = "Ada King", Email = "ada@example.com" };
+
+            // Act
+            await service.SaveStudentAsync(student);
+
+            // Assert
+            Assert.Same(student, updated);
+            mockStudentRepo.Verify(r => r.Update(It.IsAny<Student>()), Times.Once);
+            mockStudentRepo.Verify(r => r.AddAsync(It.IsAny<Student>()), Times.Never);
+            mockStudentRepo.Verify(r => r.SaveAsync(), Times.Once);
+            mockCache.Verify(c => c.RemoveAsync("students_all", It.IsAny<CancellationToken>()), Times.Once);
+            mockCache.Verify(c => c.RemoveAsync("student_7", It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task SaveStudentAsync_NewStudent_AddsAndInvalidatesCaches()
+        {
+            // Arrange — Id 0 means a new row; the database assigns the Id (see the
+            // SqlServer integration test for the identity assertion itself)
+            var mockStudentRepo = new Mock<IStudentRepository>();
+            var mockEnrollmentRepo = new Mock<IEnrollmentRepository>();
+            var mockCache = new Mock<IDistributedCache>();
+
+            Student? added = null;
+            mockStudentRepo.Setup(r => r.AddAsync(It.IsAny<Student>())).Callback<Student>(s => added = s).Returns(Task.CompletedTask);
+
+            var service = new StudentService(mockStudentRepo.Object, mockEnrollmentRepo.Object, mockCache.Object, NullLogger<StudentService>.Instance);
+            var student = new Student { Name = "Ada Lovelace", Email = "ada@example.com" };
+
+            // Act
+            await service.SaveStudentAsync(student);
+
+            // Assert
+            Assert.Same(student, added);
+            mockStudentRepo.Verify(r => r.AddAsync(It.IsAny<Student>()), Times.Once);
+            mockStudentRepo.Verify(r => r.Update(It.IsAny<Student>()), Times.Never);
+            mockStudentRepo.Verify(r => r.SaveAsync(), Times.Once);
+            mockCache.Verify(c => c.RemoveAsync("students_all", It.IsAny<CancellationToken>()), Times.Once);
+            mockCache.Verify(c => c.RemoveAsync("student_0", It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task DeleteStudentAsync_Student_DeletesAndInvalidatesCaches()
+        {
+            // Arrange
+            var mockStudentRepo = new Mock<IStudentRepository>();
+            var mockEnrollmentRepo = new Mock<IEnrollmentRepository>();
+            var mockCache = new Mock<IDistributedCache>();
+
+            var service = new StudentService(mockStudentRepo.Object, mockEnrollmentRepo.Object, mockCache.Object, NullLogger<StudentService>.Instance);
+
+            // Act — the enrollment cascade is a database concern, asserted by
+            // DeleteStudentAsync_StudentWithEnrollments_ReturnsEnrollmentsCascaded
+            await service.DeleteStudentAsync(7);
+
+            // Assert
+            mockStudentRepo.Verify(r => r.DeleteAsync(7), Times.Once);
+            mockStudentRepo.Verify(r => r.SaveAsync(), Times.Once);
+            mockCache.Verify(c => c.RemoveAsync("students_all", It.IsAny<CancellationToken>()), Times.Once);
+            mockCache.Verify(c => c.RemoveAsync("student_7", It.IsAny<CancellationToken>()), Times.Once);
+        }
     }
 
 }

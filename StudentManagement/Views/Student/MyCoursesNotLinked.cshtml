@@ -1,0 +1,12 @@
+@{
+    ViewData["Title"] = "My Courses";
+}
+
+<h2>My Courses</h2>
+
+<div class="alert alert-warning">
+    Your account is not linked to a student record yet, so there are no courses to show.
+    Please ask an administrator to link your account from the <strong>Users</strong> page.
+</div>
+
+<a class="btn btn-outline-primary" href="@Url.Action("Index", "Home")">Back to Home</a>

@@ -128,6 +128,9 @@ public sealed class EvaluationService : IEvaluationService
         var tools = new List<AITool>();
         if (config.IncludeTools)
         {
+            // Evaluation runs as a staff-level harness: it exercises the full toolset on
+            // purpose, unlike ChatService which scopes tools by the caller's role. Do not
+            // "fix" this to per-role gating without changing the evaluation dataset.
             tools.AddRange(_chatTools.GetTools());
         }
 

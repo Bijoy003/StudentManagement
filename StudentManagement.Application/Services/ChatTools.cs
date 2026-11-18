@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Text.Json;
 using Microsoft.Extensions.AI;
+using StudentManagement.Application.Authorization;
 using StudentManagement.Application.Interfaces;
 
 namespace StudentManagement.Application.Services
@@ -23,18 +24,33 @@ namespace StudentManagement.Application.Services
             _enrollmentService = enrollmentService;
         }
 
-        public IList<AITool> GetTools() =>
-        [
-            AIFunctionFactory.Create(ListStudentsAsync),
-            AIFunctionFactory.Create(GetStudentByIdAsync),
-            AIFunctionFactory.Create(GetStudentsEnrolledInMoreThanAsync),
-            AIFunctionFactory.Create(ListCoursesAsync),
-            AIFunctionFactory.Create(GetCourseByIdAsync),
-            AIFunctionFactory.Create(GetStudentCountPerCourseAsync),
-            AIFunctionFactory.Create(ListEnrollmentsAsync),
-            AIFunctionFactory.Create(GetStudentsInCourseAsync),
-            AIFunctionFactory.Create(GetCoursesForStudentAsync)
-        ];
+        public IList<AITool> GetTools() => GetToolsFor(AppRoles.All);
+
+        // Student and User callers get the course catalog only: rosters, enrollments and
+        // grades stay out of reach until the signed-in account is linked to a student record.
+        public IList<AITool> GetToolsFor(IEnumerable<string>? roles)
+        {
+            var tools = new List<AITool>
+            {
+                AIFunctionFactory.Create(ListCoursesAsync),
+                AIFunctionFactory.Create(GetCourseByIdAsync),
+                AIFunctionFactory.Create(GetStudentCountPerCourseAsync)
+            };
+
+            if (!AppRoles.IsStaff(roles))
+            {
+                return tools;
+            }
+
+            tools.Add(AIFunctionFactory.Create(ListStudentsAsync));
+            tools.Add(AIFunctionFactory.Create(GetStudentByIdAsync));
+            tools.Add(AIFunctionFactory.Create(GetStudentsEnrolledInMoreThanAsync));
+            tools.Add(AIFunctionFactory.Create(ListEnrollmentsAsync));
+            tools.Add(AIFunctionFactory.Create(GetStudentsInCourseAsync));
+            tools.Add(AIFunctionFactory.Create(GetCoursesForStudentAsync));
+
+            return tools;
+        }
 
         [Description("Lists all students with id, name, email, phone, address, and enrollment date.")]
         public async Task<string> ListStudentsAsync(CancellationToken cancellationToken = default)

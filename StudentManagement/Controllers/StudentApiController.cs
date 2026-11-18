@@ -6,12 +6,13 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 using StudentManagement.Application.DTOs.Common;
 using StudentManagement.Application.DTOs.Students;
 using StudentManagement.Domain.Entities;
+using StudentManagement.Application.Authorization;
 
 namespace StudentManagement.Web.Controllers;
 
 [ApiController]
 [Route("api/students")]
-[Authorize]
+[Authorize(Policy = Policies.Staff)]
 [Produces("application/json")]
 public sealed class StudentApiController : ControllerBase
 {
@@ -98,7 +99,7 @@ public sealed class StudentApiController : ControllerBase
 
     // POST api/students
     [HttpPost(Name = "ApiCreateStudent")]
-    [Authorize(Roles = "Admin,Teacher")]
+    [Authorize(Policy = Policies.Staff)]
     [ProducesResponseType(typeof(StudentDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<StudentDto>> CreateStudent([FromBody] StudentRequest request)
@@ -127,7 +128,7 @@ public sealed class StudentApiController : ControllerBase
 
     // PUT api/students/5
     [HttpPut("{id:int}", Name = "ApiUpdateStudent")]
-    [Authorize(Roles = "Admin,Teacher")]
+    [Authorize(Policy = Policies.Staff)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -160,7 +161,7 @@ public sealed class StudentApiController : ControllerBase
 
     // PATCH api/students/5  (application/merge-patch+json)
     [HttpPatch("{id:int}", Name = "ApiPatchStudent")]
-    [Authorize(Roles = "Admin,Teacher")]
+    [Authorize(Policy = Policies.Staff)]
     [Consumes("application/json", "application/merge-patch+json")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
@@ -195,7 +196,7 @@ public sealed class StudentApiController : ControllerBase
 
     // DELETE api/students/5
     [HttpDelete("{id:int}", Name = "ApiDeleteStudent")]
-    [Authorize(Roles = "Admin,Teacher")]
+    [Authorize(Policy = Policies.Staff)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteStudent(int id)

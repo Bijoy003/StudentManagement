@@ -93,7 +93,10 @@ async function sendMessage() {
     try {
         const response = await fetch('/Chat/Send', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': getAntiForgeryToken()
+            },
             body: JSON.stringify({ messages: chatHistory })
         });
 
@@ -170,6 +173,10 @@ function normalizeAssistantMarkdown(text) {
         .replace(/(\*\*[^*]+:\*\*)\s+(\*)/g, '$1\n$2')
         .replace(/:\s+(\*\s+\*\*)/g, ':\n$1')
         .replace(/(\S)\s+(\*\s+\*\*)/g, '$1\n$2');
+}
+
+function getAntiForgeryToken() {
+    return $('input[name="__RequestVerificationToken"]').val() || '';
 }
 
 function setInputEnabled(enabled) {

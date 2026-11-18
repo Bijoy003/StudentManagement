@@ -1,8 +1,11 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using StudentManagement.Application.Authorization;
 
 namespace StudentManagement.Web.Controllers
 {
+    // Catalog reads are open to any signed-in role (matching the chat catalog tools);
+    // create/edit/delete stay Staff-only, with ownership checks on the teacher's own rows.
     [Authorize]
     public class CourseController : Controller
     {
@@ -33,6 +36,7 @@ namespace StudentManagement.Web.Controllers
             }
         }
 
+        [Authorize(Policy = Policies.Staff)]
         public async Task<IActionResult> Create(int? id)
         {
             try
@@ -50,6 +54,11 @@ namespace StudentManagement.Web.Controllers
                     {
                         return NotFound();
                     }
+
+                    if (!CanManageCourse(course))
+                    {
+                        return Forbid();
+                    }
                 }
 
                 return View(course);
@@ -62,6 +71,7 @@ namespace StudentManagement.Web.Controllers
         }
 
         [HttpPost]
+        [Authorize(Policy = Policies.Staff)]
         public async Task<IActionResult> Save([FromBody] Course course)
         {
             try
@@ -75,6 +85,24 @@ namespace StudentManagement.Web.Controllers
 
                     return BadRequest(new { Message = firstError });
                 }
+
+                if (course.Id != 0)
+                {
+                    // Ownership is checked against the persisted row, never the bound
+                    // payload — a crafted TeacherId must not grant edit rights.
+                    var persisted = await _courseService.GetCourseById(course.Id);
+                    if (persisted is null || !CanManageCourse(persisted))
+                    {
+                        return Forbid();
+                    }
+                }
+
+                // Teachers own what they create; admins may assign ownership explicitly.
+                if (course.Id == 0 && !User.IsInRole(AppRoles.Admin))
+                {
+                    course.TeacherId = User.Identity?.Name;
+                }
+
                 await _courseService.SaveCourse(course);
                 return Ok(true);
             }
@@ -85,10 +113,17 @@ namespace StudentManagement.Web.Controllers
             }
         }
 
+        [Authorize(Policy = Policies.Staff)]
         public async Task<bool> Delete(int id)
         {
             try
             {
+                var course = await _courseService.GetCourseById(id);
+                if (course is null || !CanManageCourse(course))
+                {
+                    return false;
+                }
+
                 await _courseService.DeleteCourse(id);
                 return true;
             }
@@ -113,5 +148,10 @@ namespace StudentManagement.Web.Controllers
                 return View("Error");
             }
         }
+
+        // Ownership stays resource-based: admins manage every course, teachers only their own.
+        private bool CanManageCourse(Course course) =>
+            User.IsInRole(AppRoles.Admin)
+            || string.Equals(course.TeacherId, User.Identity?.Name, StringComparison.OrdinalIgnoreCase);
     }
 }

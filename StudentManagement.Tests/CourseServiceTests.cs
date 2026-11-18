@@ -56,10 +56,11 @@ public class CourseServiceTests
     }
 
     [Fact]
-    public async Task SaveCourse_NewCourse_IgnoresBoundTeacherId()
+    public async Task SaveCourse_NewCourse_PreservesBoundTeacherId()
     {
-        // Arrange - the legacy UI never assigns teachers; ownership is stamped only
-        // through TeacherService, so a bound TeacherId must be discarded
+        // Arrange - CourseController stamps the signed-in teacher as owner on create
+        // (admins may assign ownership explicitly), so the service must keep it.
+        // The REST API never binds TeacherId through its DTOs.
         var mockRepo = new Mock<ICourseRepository>();
         var mockCache = new Mock<IDistributedCache>();
 
@@ -72,7 +73,7 @@ public class CourseServiceTests
             Id = 0,
             Name = "New Course",
             Credits = 3,
-            TeacherId = "x",
+            TeacherId = "teacher-a",
             Enrollments = new List<Enrollment> { new() { Id = 99, CourseId = 0, StudentId = 11 } }
         };
 
@@ -84,7 +85,7 @@ public class CourseServiceTests
         mockRepo.Verify(r => r.Update(It.IsAny<Course>()), Times.Never);
         mockRepo.Verify(r => r.SaveChangesAsync(), Times.Once);
         Assert.NotNull(added);
-        Assert.Null(added!.TeacherId);
+        Assert.Equal("teacher-a", added!.TeacherId);
         Assert.Empty(added.Enrollments);
     }
 }

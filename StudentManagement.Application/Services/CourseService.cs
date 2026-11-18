@@ -72,9 +72,8 @@ namespace StudentManagement.Application.Services
 
             if (course.Id == 0)
             {
-                // The legacy course UI never assigns teachers; ownership is stamped only
-                // through TeacherService.SaveCourseAsync, so any bound TeacherId is ignored.
-                course.TeacherId = null;
+                // Ownership is stamped by the caller: CourseController sets the signed-in
+                // teacher (admins may assign explicitly); the REST DTOs never bind it.
                 await _courseRepository.AddAsync(course);
             }
             else

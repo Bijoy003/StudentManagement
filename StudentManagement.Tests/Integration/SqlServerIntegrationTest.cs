@@ -79,14 +79,6 @@ public abstract class SqlServerIntegrationTest : IAsyncLifetime
             Cache,
             NullLogger<EnrollmentService>.Instance);
 
-    protected TeacherService CreateTeacherService() =>
-        new(
-            new CourseRepository(WriteContext, ReadOnlyContext),
-            new EnrollmentRepository(WriteContext, ReadOnlyContext),
-            Cache,
-            MemoryCache,
-            NullLogger<TeacherService>.Instance);
-
     protected async Task SeedAsync(Func<ApplicationDbContext, Task> seed)
     {
         await seed(WriteContext);

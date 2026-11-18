@@ -233,6 +233,44 @@ public class TeacherServiceTests
     }
 
     [Fact]
+    public async Task DeleteCourseAsync_OwnedCourse_InvalidatesCourseAndEnrollmentCaches()
+    {
+        // Arrange — prime the in-process entries a prior page load would have written;
+        // deleting the course also cascades its enrollments in the database
+        var mockCourseRepo = new Mock<ICourseRepository>();
+        var mockEnrollmentRepo = new Mock<IEnrollmentRepository>();
+        SetupCourseLookups(mockCourseRepo, 5, OwnedCourse(5));
+
+        var mockCache = new Mock<IDistributedCache>();
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        memoryCache.Set("enrollments_all", "stale");
+        memoryCache.Set("enrollment_course_5", "stale");
+        memoryCache.Set("enrollment_students_course_5", "stale");
+
+        var service = new TeacherService(
+            mockCourseRepo.Object,
+            mockEnrollmentRepo.Object,
+            mockCache.Object,
+            memoryCache,
+            new Mock<ILogger<TeacherService>>().Object);
+
+        // Act
+        var result = await service.DeleteCourseAsync(5, TeacherId);
+
+        // Assert — CourseService-owned keys are evicted from the distributed cache...
+        Assert.True(result);
+        mockCache.Verify(c => c.RemoveAsync("courses_all", It.IsAny<CancellationToken>()), Times.Once);
+        mockCache.Verify(c => c.RemoveAsync("course_student_counts", It.IsAny<CancellationToken>()), Times.Once);
+        mockCache.Verify(c => c.RemoveAsync("course_5", It.IsAny<CancellationToken>()), Times.Once);
+
+        // ...and the enrollment caches keyed on the deleted course are evicted in-process,
+        // so EnrollmentService cannot serve the cascaded rows from memory
+        Assert.False(memoryCache.TryGetValue("enrollments_all", out _));
+        Assert.False(memoryCache.TryGetValue("enrollment_course_5", out _));
+        Assert.False(memoryCache.TryGetValue("enrollment_students_course_5", out _));
+    }
+
+    [Fact]
     public async Task GetEnrollmentsByCourseAsync_UsesReadOnlyWithStudentInclude_ReturnsEnrollments()
     {
         // Arrange

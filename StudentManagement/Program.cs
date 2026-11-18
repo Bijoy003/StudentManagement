@@ -5,6 +5,7 @@ using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.OpenApi.Models;
 using StudentManagement.Application;
+using StudentManagement.Application.Authorization;
 using StudentManagement.Application.Interfaces;
 using StudentManagement.Application.Evaluation;
 using StudentManagement.Application.Validation;
@@ -120,6 +121,14 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(Policies.AdminOnly, policy => policy.RequireRole(AppRoles.Admin));
+    options.AddPolicy(Policies.TeacherOnly, policy => policy.RequireRole(AppRoles.Teacher));
+    options.AddPolicy(Policies.Staff, policy => policy.RequireRole(AppRoles.Admin, AppRoles.Teacher));
+    options.AddPolicy(Policies.StudentSelf, policy => policy.RequireRole(AppRoles.Student));
+});
 
 builder.Services.AddAuthentication()
     .AddGoogle(options =>

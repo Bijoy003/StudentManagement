@@ -1,5 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using StudentManagement.Application.Authorization;
+using StudentManagement.Infrastructure.Data;
 using System.ComponentModel.DataAnnotations;
 
 namespace StudentManagement.Web.Controllers
@@ -8,25 +11,36 @@ namespace StudentManagement.Web.Controllers
     public class StudentController : Controller
     {
         private readonly IStudentService _studentService;
+        private readonly IEnrollmentService _enrollmentService;
+        private readonly UserManager<ApplicationUser> _userManager;
         private readonly ILogger<StudentController> _logger;
 
-        public StudentController(IStudentService studentService, ILogger<StudentController> logger)
+        public StudentController(
+            IStudentService studentService,
+            IEnrollmentService enrollmentService,
+            UserManager<ApplicationUser> userManager,
+            ILogger<StudentController> logger)
         {
             _studentService = studentService;
+            _enrollmentService = enrollmentService;
+            _userManager = userManager;
             _logger = logger;
         }
 
+        [Authorize(Policy = Policies.Staff)]
         public IActionResult Index()
         {
             return View();
         }
 
+        [Authorize(Policy = Policies.Staff)]
         public async Task<JsonResult> GetStudentList()
         {
             var students = await _studentService.GetStudentsAsync();
             return new JsonResult(students);
         }
 
+        [Authorize(Policy = Policies.AdminOnly)]
         public async Task<IActionResult> Create(int? id)
         {
             ViewBag.Student = null;
@@ -39,6 +53,7 @@ namespace StudentManagement.Web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Policy = Policies.AdminOnly)]
         public async Task<IActionResult> SaveStudent([FromBody] Student student)
         {
             try
@@ -69,6 +84,7 @@ namespace StudentManagement.Web.Controllers
             }
         }
 
+        [Authorize(Policy = Policies.AdminOnly)]
         public async Task<IActionResult> DeleteStudent(int id)
         {
             try
@@ -83,6 +99,7 @@ namespace StudentManagement.Web.Controllers
             }
         }
 
+        [Authorize(Policy = Policies.AdminOnly)]
         public async Task<IActionResult> EnrolledInMoreThan(int courseCount = 2)
         {
             try
@@ -94,6 +111,35 @@ namespace StudentManagement.Web.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "An error occurred.");
+                return View("Error");
+            }
+        }
+
+        // Student-role landing page: an account sees only its own enrollments. The link is
+        // kept in AspNetUsers.StudentId so the query never trusts a route value.
+        [Authorize(Policy = Policies.StudentSelf)]
+        public async Task<IActionResult> MyCourses()
+        {
+            try
+            {
+                var user = await _userManager.GetUserAsync(User);
+                if (user?.StudentId is null)
+                {
+                    return View("MyCoursesNotLinked");
+                }
+
+                var enrollments = await _enrollmentService.GetEnrollments();
+                var mine = enrollments
+                    .Where(enrollment => enrollment.StudentId == user.StudentId.Value)
+                    .OrderBy(enrollment => enrollment.Course?.Name)
+                    .ToList();
+
+                ViewBag.StudentName = user.FullName;
+                return View(mine);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while loading the student's courses.");
                 return View("Error");
             }
         }

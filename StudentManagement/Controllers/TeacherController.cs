@@ -3,10 +3,11 @@ using Microsoft.AspNetCore.Mvc;
 using StudentManagement.Application.Interfaces;
 using StudentManagement.Domain.Entities;
 using System.ComponentModel.DataAnnotations;
+using StudentManagement.Application.Authorization;
 
 namespace StudentManagement.Web.Controllers;
 
-[Authorize(Roles = "Teacher")]
+[Authorize(Policy = Policies.TeacherOnly)]
 public class TeacherController : Controller
 {
     private readonly ITeacherService _teacherService;

@@ -13,11 +13,14 @@
     <h3><b>Students</b></h3>
 </div>
 
+@if (User.IsInRole(AppRoles.Admin))
+{
 <div class="mb-3 d-flex gap-2">
     <a class="btn btn-outline-primary" href="/Student/EnrolledInMoreThan">
         Show Students enrolled
     </a>
 </div>
+}
 
 <div class="container border-2 p-4" style="max-width:3000px;">
     <table id="student-grid" class="table table-striped" style="width:100%">
@@ -33,11 +36,14 @@
         </thead>
     </table>
 </div>
+@if (User.IsInRole(AppRoles.Admin))
+{
 <div class="d-flex gap-3 mt-3 justify-content-end">
     <button class="btn btn-default text-center btn-outline-success" id="create-button" onclick="addStudent()">Create</button>
     <button class="btn btn-default text-center btn-outline-primary" onclick="editStudent()">Edit</button>
     <button class="btn btn-default text-center btn-outline-danger" onclick="deleteStudent()">Delete</button>
 </div>
+}
 
 @section Scripts
 {

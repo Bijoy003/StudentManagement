@@ -1,10 +1,11 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using StudentManagement.Application.Authorization;
 
 namespace StudentManagement.Web.Controllers
 {
-    [Authorize]
+    [Authorize(Policy = Policies.Staff)]
     public class EnrollmentController : Controller
     {
         private readonly IEnrollmentService _enrollmentService;
@@ -71,6 +72,25 @@ namespace StudentManagement.Web.Controllers
 
                     return BadRequest(new { Message = firstError });
                 }
+
+                var course = await _courseService.GetCourseById(enrollment.CourseId);
+                if (course is null || !CanManageCourse(course))
+                {
+                    return Forbid();
+                }
+
+                if (enrollment.Id != 0)
+                {
+                    // Updates must also own the enrollment's CURRENT course: a crafted
+                    // CourseId must not move a row out of another teacher's course.
+                    var persisted = await _enrollmentService.GetEnrollmentById(enrollment.Id);
+                    var persistedCourse = persisted is null ? null : await _courseService.GetCourseById(persisted.CourseId);
+                    if (persistedCourse is null || !CanManageCourse(persistedCourse))
+                    {
+                        return Forbid();
+                    }
+                }
+
                 await _enrollmentService.SaveEnrollment(enrollment);
                 return Ok(true);
             }
@@ -81,11 +101,18 @@ namespace StudentManagement.Web.Controllers
             }
         }
 
-        public bool Delete(int id)
+        public async Task<bool> Delete(int id)
         {
             try
             {
-                _enrollmentService.DeleteEnrollment(id);
+                var enrollment = await _enrollmentService.GetEnrollmentById(id);
+                var course = enrollment is null ? null : await _courseService.GetCourseById(enrollment.CourseId);
+                if (course is null || !CanManageCourse(course))
+                {
+                    return false;
+                }
+
+                await _enrollmentService.DeleteEnrollment(id);
                 return true;
             }
             catch (Exception ex)
@@ -134,5 +161,11 @@ namespace StudentManagement.Web.Controllers
                 return View("Error");
             }
         }
+
+        // Ownership stays resource-based: admins manage every enrollment, teachers only
+        // enrollments in courses they own.
+        private bool CanManageCourse(Course course) =>
+            User.IsInRole(AppRoles.Admin)
+            || string.Equals(course.TeacherId, User.Identity?.Name, StringComparison.OrdinalIgnoreCase);
     }
 }

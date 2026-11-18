@@ -4,12 +4,13 @@ using StudentManagement.Application.Evaluation;
 using StudentManagement.Application.Evaluation.Datasets;
 using StudentManagement.Application.Evaluation.Interfaces;
 using StudentManagement.Application.Evaluation.Models;
+using StudentManagement.Application.Authorization;
 
 namespace StudentManagement.Controllers;
 
 [ApiController]
 [Route("api/evaluation")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = Policies.AdminOnly)]
 public sealed class EvaluationController : ControllerBase
 {
     private readonly IEvaluationService _evaluationService;

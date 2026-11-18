@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using QRCoder;
+using StudentManagement.Application.Authorization;
 using StudentManagement.Infrastructure.Data;
 using StudentManagement.Web.Models;
 using System.Drawing.Imaging;
@@ -57,7 +58,7 @@ namespace StudentManagement.Web.Controllers
                 );
 
                 if (mfaResult.Succeeded)
-                    return RedirectToAction("Index", "Home");
+                    return RedirectToAction(nameof(Landing));
 
                 ModelState.AddModelError("", "Invalid or expired verification code");
                 return View(model);
@@ -91,7 +92,7 @@ namespace StudentManagement.Web.Controllers
             }
 
             if (result.Succeeded)
-                return RedirectToAction("Index", "Home");
+                return RedirectToAction(nameof(Landing));
 
             ModelState.AddModelError("", "Invalid email or password");
             return View(model);
@@ -113,10 +114,24 @@ namespace StudentManagement.Web.Controllers
             );
 
             if (result.Succeeded)
-                return RedirectToAction("Index", "Home");
+                return RedirectToAction(nameof(Landing));
 
             ModelState.AddModelError("", "Invalid or expired verification code");
             return View("Login", model);
+        }
+
+        // Routing hop after a successful sign-in: the claims principal is only the
+        // authenticated one on the next request, so role-based landing is resolved here.
+        [Authorize]
+        [HttpGet]
+        public IActionResult Landing()
+        {
+            if (User.IsInRole(AppRoles.Student))
+            {
+                return RedirectToAction("MyCourses", "Student");
+            }
+
+            return RedirectToAction("Index", "Home");
         }
 
         [HttpGet]

@@ -8,6 +8,11 @@ namespace StudentManagement.Infrastructure.Data
     public class ApplicationUser : IdentityUser
     {
         public string FullName { get; set; } = string.Empty;
+
+        // Links a Student role account to its own record. SetNull on delete so removing a
+        // student does not delete the login.
+        public int? StudentId { get; set; }
+        public Student? Student { get; set; }
     }
 
     public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
@@ -21,5 +26,20 @@ namespace StudentManagement.Infrastructure.Data
         public DbSet<Enrollment> Enrollments { get; set; }
         public DbSet<StudentArchive> StudentsArchive { get; set; }
         public DbSet<EnrollmentArchive> EnrollmentsArchive { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder builder)
+        {
+            base.OnModelCreating(builder);
+
+            builder.Entity<ApplicationUser>()
+                .HasOne(user => user.Student)
+                .WithMany()
+                .HasForeignKey(user => user.StudentId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<ApplicationUser>()
+                .HasIndex(user => user.StudentId)
+                .IsUnique();
+        }
     }
 }

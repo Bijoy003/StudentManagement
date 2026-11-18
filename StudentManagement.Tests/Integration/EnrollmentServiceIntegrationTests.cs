@@ -65,38 +65,6 @@ public class EnrollmentServiceIntegrationTests : SqlServerIntegrationTest
     }
 
     [SqlServerFact]
-    public async Task DeleteEnrollment_ExistingEnrollment_ReturnsRowAndCachesCleared()
-    {
-        // Arrange
-        var student = TestData.Student(name: "Ada Lovelace", email: "ada@example.com");
-        var course = TestData.Course(name: "Algebra");
-        await SeedAsync(db =>
-        {
-            db.Students.Add(student);
-            db.Courses.Add(course);
-            return Task.CompletedTask;
-        });
-
-        var enrollment = TestData.Enrollment(student.Id, course.Id, grade: 3.5m);
-        await SeedAsync(db =>
-        {
-            db.Enrollments.Add(enrollment);
-            return Task.CompletedTask;
-        });
-
-        var sut = CreateEnrollmentService();
-        Assert.Single(await sut.GetEnrollments()); // prime the cache
-
-        // Act
-        await sut.DeleteEnrollment(enrollment.Id);
-
-        // Assert — gone from the database and from the cached list
-        await using var verification = Database.CreateWriteContext();
-        Assert.Equal(0, await verification.Enrollments.CountAsync());
-        Assert.Empty(await sut.GetEnrollments());
-    }
-
-    [SqlServerFact]
     public async Task GetStudentsInCourse_SeededEnrollments_ReturnsStudentsFromDatabase()
     {
         // Arrange

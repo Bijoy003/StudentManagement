@@ -1,17 +1,17 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StudentManagement.Application.DTOs.Courses;
+using StudentManagement.Application.Authorization;
 
 namespace StudentManagement.Web.Controllers;
 
 // REST surface for courses: binds/returns CourseDto / CourseRequest ONLY — never the
 // Course entity (AGENTS rule 2). Create/update flow through CourseMappingExtensions
 // into ICourseService.SaveCourse, with the same status-code style AND the same authz
-// split as StudentApiController: reads any-authenticated under the class-level
-// [Authorize], writes gated to Admin/Teacher on the action.
+// gate as StudentApiController: every action is Staff-only (Admin or Teacher).
 [ApiController]
 [Route("api/courses")]
-[Authorize]
+[Authorize(Policy = Policies.Staff)]
 [Produces("application/json")]
 public sealed class CourseApiController : ControllerBase
 {
@@ -26,6 +26,7 @@ public sealed class CourseApiController : ControllerBase
 
     // GET api/courses
     [HttpGet(Name = "ApiGetCourses")]
+    [Authorize(Policy = Policies.Staff)]
     [ProducesResponseType(typeof(IEnumerable<CourseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
@@ -45,6 +46,7 @@ public sealed class CourseApiController : ControllerBase
 
     // GET api/courses/5
     [HttpGet("{id:int}", Name = "ApiGetCourseById")]
+    [Authorize(Policy = Policies.Staff)]
     [ProducesResponseType(typeof(CourseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<CourseDto>> GetCourseById(int id)
@@ -68,7 +70,7 @@ public sealed class CourseApiController : ControllerBase
 
     // POST api/courses
     [HttpPost(Name = "ApiCreateCourse")]
-    [Authorize(Roles = "Admin,Teacher")]
+    [Authorize(Policy = Policies.Staff)]
     [ProducesResponseType(typeof(CourseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<CourseDto>> CreateCourse([FromBody] CourseRequest request)
@@ -90,7 +92,7 @@ public sealed class CourseApiController : ControllerBase
 
     // PUT api/courses/5
     [HttpPut("{id:int}", Name = "ApiUpdateCourse")]
-    [Authorize(Roles = "Admin,Teacher")]
+    [Authorize(Policy = Policies.Staff)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -118,7 +120,7 @@ public sealed class CourseApiController : ControllerBase
 
     // DELETE api/courses/5
     [HttpDelete("{id:int}", Name = "ApiDeleteCourse")]
-    [Authorize(Roles = "Admin,Teacher")]
+    [Authorize(Policy = Policies.Staff)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteCourse(int id)

@@ -2,6 +2,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
+using StudentManagement.Application.Authorization;
 using StudentManagement.Application.Configuration;
 using StudentManagement.Application.Interfaces;
 using StudentManagement.Application.Services;
@@ -19,7 +20,7 @@ public class ChatContractTests
     {
         var pipeline = CreatePipeline();
 
-        var reply = await pipeline.Service.GetReplyAsync([new ChatMessage(ChatRole.User, "How many students?")]);
+        var reply = await pipeline.Service.GetReplyAsync([new ChatMessage(ChatRole.User, "How many students?")], AppRoles.All);
 
         Assert.Equal("There are 2 students.", reply);
         pipeline.Students.Verify(service => service.GetStudentsAsync(), Times.Once);
@@ -30,7 +31,7 @@ public class ChatContractTests
     {
         var pipeline = CreatePipeline();
 
-        await pipeline.Service.GetReplyAsync([new ChatMessage(ChatRole.User, "How many students?")]);
+        await pipeline.Service.GetReplyAsync([new ChatMessage(ChatRole.User, "How many students?")], AppRoles.All);
 
         Assert.Equal(2, pipeline.Inner.Requests.Count);
         Assert.Equal(2, pipeline.Inner.Requests[0].Count);
@@ -42,7 +43,7 @@ public class ChatContractTests
     {
         var pipeline = CreatePipeline();
 
-        await pipeline.Service.GetReplyAsync([new ChatMessage(ChatRole.User, "How many students?")]);
+        await pipeline.Service.GetReplyAsync([new ChatMessage(ChatRole.User, "How many students?")], AppRoles.All);
 
         var secondRequest = pipeline.Inner.Requests[1];
         var call = Assert.Single(secondRequest.SelectMany(m => m.Contents).OfType<FunctionCallContent>());
@@ -59,7 +60,7 @@ public class ChatContractTests
     {
         var pipeline = CreatePipeline();
 
-        await pipeline.Service.GetReplyAsync([new ChatMessage(ChatRole.User, "How many students?")]);
+        await pipeline.Service.GetReplyAsync([new ChatMessage(ChatRole.User, "How many students?")], AppRoles.All);
 
         var tools = pipeline.Inner.Options[0]?.Tools;
         Assert.NotNull(tools);

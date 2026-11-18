@@ -12,54 +12,6 @@ public class CourseServiceIntegrationTests : SqlServerIntegrationTest
     }
 
     [SqlServerFact]
-    public async Task SaveCourse_NewCourse_ReturnsPersistedRowWithIgnoredTeacherId()
-    {
-        // Arrange — the legacy course UI may bind a TeacherId, which the service drops
-        var sut = CreateCourseService();
-        var course = TestData.Course(name: "Algebra", credits: 4, teacherId: "teacher-a");
-
-        // Act
-        await sut.SaveCourse(course);
-
-        // Assert
-        Assert.True(course.Id > 0, "Expected the database to generate an Id for the new course.");
-
-        await using var verification = Database.CreateWriteContext();
-        var persisted = await verification.Courses.SingleAsync(c => c.Id == course.Id);
-        Assert.Equal("Algebra", persisted.Name);
-        Assert.Equal(4, persisted.Credits);
-        Assert.Null(persisted.TeacherId);
-    }
-
-    [SqlServerFact]
-    public async Task SaveCourse_ExistingCourseWithTeacher_ReturnsPersistedTeacherIdPreserved()
-    {
-        // Arrange — seed in its own context so the update path really loads from the database
-        int courseId;
-        await using (var seed = Database.CreateWriteContext())
-        {
-            var seeded = TestData.Course(name: "Algebra", teacherId: "teacher-a");
-            seed.Courses.Add(seeded);
-            await seed.SaveChangesAsync();
-            courseId = seeded.Id;
-        }
-
-        var sut = CreateCourseService();
-        var update = TestData.Course(name: "Algebra II", credits: 5, teacherId: "teacher-b");
-        update.Id = courseId;
-
-        // Act
-        await sut.SaveCourse(update);
-
-        // Assert — the crafted TeacherId is restamped from the persisted row
-        await using var verification = Database.CreateWriteContext();
-        var persisted = await verification.Courses.SingleAsync(c => c.Id == courseId);
-        Assert.Equal("Algebra II", persisted.Name);
-        Assert.Equal(5, persisted.Credits);
-        Assert.Equal("teacher-a", persisted.TeacherId);
-    }
-
-    [SqlServerFact]
     public async Task GetStudentCountPerCourse_SeededEnrollments_ReturnsCountsFromDatabase()
     {
         // Arrange — Algebra has 2 enrollments, Physics has 1

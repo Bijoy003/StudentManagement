@@ -1,0 +1,93 @@
+@model UserManagementViewModel
+
+@{
+    ViewData["Title"] = "User Management";
+}
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Users</h2>
+        <a class="btn btn-outline-primary" asp-action="CreateUser">Create User</a>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Full Name</th>
+                <th>Role</th>
+                <th>Linked Student</th>
+                <th style="min-width: 220px;">Set Role</th>
+                <th style="min-width: 220px;">Reset Password</th>
+                <th style="min-width: 260px;">Link Student</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var user in Model.Users)
+            {
+                <tr>
+                    <td>@user.Email</td>
+                    <td>@user.FullName</td>
+                    <td>
+                        @foreach (var role in user.Roles)
+                        {
+                            <span class="badge bg-secondary me-1">@role</span>
+                        }
+                    </td>
+                    <td>
+                        @if (user.StudentId != null)
+                        {
+                            <span>@user.StudentName (#@user.StudentId)</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                    </td>
+                    <td>
+                        <form asp-action="SetRole" method="post" class="d-flex gap-2">
+                            <input type="hidden" name="UserId" value="@user.Id" />
+                            <select name="Role" class="form-select form-select-sm">
+                                @foreach (var role in Model.Roles)
+                                {
+                                    <option value="@role" selected="@(user.Roles.Contains(role))">@role</option>
+                                }
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-outline-primary">Apply</button>
+                        </form>
+                    </td>
+                    <td>
+                        <form asp-action="ResetUserPassword" method="post" class="d-flex gap-2">
+                            <input type="hidden" name="UserId" value="@user.Id" />
+                            <input type="password" name="NewPassword" class="form-control form-control-sm"
+                                   placeholder="New password" required minlength="6" />
+                            <button type="submit" class="btn btn-sm btn-outline-warning">Reset</button>
+                        </form>
+                    </td>
+                    <td>
+                        <form asp-action="LinkStudent" method="post" class="d-flex gap-2">
+                            <input type="hidden" name="UserId" value="@user.Id" />
+                            <select name="StudentId" class="form-select form-select-sm">
+                                <option value="">— Not linked —</option>
+                                @foreach (var student in Model.Students)
+                                {
+                                    <option value="@student.Id" selected="@(user.StudentId == student.Id)">@student.Name (#@student.Id)</option>
+                                }
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-outline-success">Link</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

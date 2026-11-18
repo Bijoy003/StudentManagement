@@ -57,6 +57,18 @@ namespace StudentManagement.Infrastructure.Data
                     await userManager.AddToRoleAsync(teacher, "Teacher");
                 }
             }
+
+            // Create Student user if it doesn't exist
+            var student = await userManager.FindByEmailAsync("student@student.com");
+            if (student == null)
+            {
+                student = new ApplicationUser { UserName = "student@student.com", Email = "student@student.com", FullName = "Test Student", EmailConfirmed = true };
+                var result = await userManager.CreateAsync(student, "Student123"); // Password is hashed automatically
+                if (result.Succeeded)
+                {
+                    await userManager.AddToRoleAsync(student, "Student");
+                }
+            }
         }
     }
 }

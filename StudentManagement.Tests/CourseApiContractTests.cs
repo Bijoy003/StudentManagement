@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using StudentManagement.Application.Authorization;
 using StudentManagement.Application.DTOs.Courses;
 using StudentManagement.Application.Interfaces;
 using StudentManagement.Domain.Entities;
@@ -73,12 +74,12 @@ public class CourseApiContractTests
         Assert.NotNull(typeof(CourseApiController).GetCustomAttribute<ApiControllerAttribute>());
     }
 
-    // ---------- authorization contract (writes gated, reads any-authenticated) ----------
+    // ---------- authorization contract (every action gated to Staff) ----------
 
     [Fact]
-    public void CourseApiController_WriteActions_ReturnsAdminTeacherRoleGate()
+    public void CourseApiController_WriteActions_ReturnsStaffPolicyGate()
     {
-        // Arrange — mirror of StudentApiController: writes are Admin/Teacher-only
+        // Arrange — mirror of StudentApiController: writes are Staff-only
         var writeActions = new[] { "CreateCourse", "UpdateCourse", "DeleteCourse" };
 
         foreach (var name in writeActions)
@@ -90,26 +91,25 @@ public class CourseApiContractTests
 
             // Assert
             Assert.NotNull(authorize);
-            Assert.Equal("Admin,Teacher", authorize!.Roles);
+            Assert.Equal(Policies.Staff, authorize!.Policy);
         }
     }
 
     [Fact]
-    public void CourseApiController_ReadActions_ReturnsNoMethodLevelRoleGate()
+    public void CourseApiController_ReadActions_ReturnsStaffPolicyGate()
     {
-        // Arrange — GETs stay any-authenticated under the class-level [Authorize]
-        var classAuthorize = typeof(CourseApiController).GetCustomAttribute<AuthorizeAttribute>();
-        Assert.NotNull(classAuthorize);
-        Assert.Null(classAuthorize!.Roles);
+        // Arrange — reads are Staff-only too, matching StudentApiController
 
         foreach (var name in new[] { "GetCourses", "GetCourseById" })
         {
             // Act
             var action = typeof(CourseApiController).GetMethod(name);
 
-            // Assert — no action-level [Authorize] override on the reads
+            // Assert
             Assert.NotNull(action);
-            Assert.Null(action!.GetCustomAttribute<AuthorizeAttribute>());
+            var authorize = action!.GetCustomAttribute<AuthorizeAttribute>();
+            Assert.NotNull(authorize);
+            Assert.Equal(Policies.Staff, authorize!.Policy);
         }
     }
 

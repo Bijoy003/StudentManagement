@@ -28,4 +28,4 @@ Navigate to **Students** in the top menu.
 
 ## Chat data tools
 
-When users ask about students, the assistant can call tools to list students, look up a student by ID, or find students enrolled in more than a given number of courses.
+When an Admin or Teacher asks about students, the assistant can call tools to list students, look up a student by ID, or find students enrolled in more than a given number of courses. Student and User accounts cannot access student records through chat.

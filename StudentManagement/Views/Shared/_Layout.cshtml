@@ -32,18 +32,30 @@
                         @if (User.Identity.IsAuthenticated && User.IsInRole("Admin"))
                         {
                             <li class="nav-item">
-                                <a class="nav-link" href="@Url.Action("CreateUser", "Admin")">Users</a>
+                                <a class="nav-link" href="@Url.Action("Users", "Admin")">Users</a>
                             </li>
                         }
-                        <li class="nav-item">
-                            <a class="nav-link" href="@Url.Action("Index", "Student")">Students</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="@Url.Action("Index", "Course")">Courses</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="@Url.Action("Index", "Enrollment")">Enrollments</a>
-                        </li>
+                        @if (User.IsInRole(AppRoles.Admin) || User.IsInRole(AppRoles.Teacher))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" href="@Url.Action("Index", "Student")">Students</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="@Url.Action("Index", "Course")">Courses</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="@Url.Action("Index", "Enrollment")">Enrollments</a>
+                            </li>
+                        }
+                        else
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" href="@Url.Action("MyCourses", "Student")">My Courses</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="@Url.Action("Index", "Course")">Courses</a>
+                            </li>
+                        }
                         <li class="nav-item">
                             <a class="nav-link" href="@Url.Action("Index", "Chat")">Chat</a>
                         </li>
@@ -63,6 +75,13 @@
                         <li class="nav-item">
                             <span class="navbar-text me-2">
                                 Hello, @User.Identity.Name
+                                @{
+                                    var roleLabel = AppRoles.All.FirstOrDefault(role => User.IsInRole(role));
+                                }
+                                @if (!string.IsNullOrEmpty(roleLabel))
+                                {
+                                    <span class="badge bg-secondary ms-1">@roleLabel</span>
+                                }
                             </span>
                         </li>
                         <li class="nav-item">

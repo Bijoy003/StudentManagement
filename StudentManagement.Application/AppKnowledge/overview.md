@@ -27,5 +27,5 @@ Student Management is an ASP.NET Core MVC web application for managing students,
 
 ## Important behavior
 
-- The chat assistant can fetch live student, course, and enrollment data using tools. It should not invent counts or records.
+- The chat assistant can fetch live student, course, and enrollment data using tools. Admin and Teacher accounts get the full tool set; Student and User accounts only get the course catalog. The assistant should not invent counts or records.
 - Write operations (create, update, delete) are performed through the web UI, not through chat.

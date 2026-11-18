@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Moq;
+using StudentManagement.Application.Authorization;
 using StudentManagement.Application.Interfaces;
 using StudentManagement.Application.Services;
 using StudentManagement.Domain.DTOs;
@@ -280,6 +281,46 @@ public class ChatToolsTests
         var json = ChatJson.Parse(await tools.ListEnrollmentsAsync());
 
         Assert.Equal(0, json.GetArrayLength());
+    }
+
+    [Theory]
+    [InlineData(AppRoles.Admin)]
+    [InlineData(AppRoles.Teacher)]
+    public void GetToolsFor_StaffRole_ReturnsAllNineFunctionNames(string role)
+    {
+        var tools = CreateTools(out _, out _, out _).GetToolsFor([role]);
+
+        Assert.Equal(9, tools.Count);
+        Assert.Contains(tools, tool => tool.Name == "ListStudents");
+        Assert.Contains(tools, tool => tool.Name == "ListEnrollments");
+    }
+
+    [Theory]
+    [InlineData(AppRoles.Student)]
+    [InlineData(AppRoles.User)]
+    public void GetToolsFor_NonStaffRole_ReturnsCatalogToolsOnly(string role)
+    {
+        var tools = CreateTools(out _, out _, out _).GetToolsFor([role]);
+
+        var names = tools.Select(t => t.Name).OrderBy(n => n).ToList();
+        Assert.Equal(new[] { "GetCourseById", "GetStudentCountPerCourse", "ListCourses" }, names);
+    }
+
+    [Fact]
+    public void GetToolsFor_NoRoles_ReturnsCatalogToolsOnly()
+    {
+        var tools = CreateTools(out _, out _, out _).GetToolsFor([]);
+
+        Assert.Equal(3, tools.Count);
+        Assert.DoesNotContain(tools, tool => tool.Name == "ListStudents");
+    }
+
+    [Fact]
+    public void GetToolsFor_UnknownRole_ReturnsCatalogToolsOnly()
+    {
+        var tools = CreateTools(out _, out _, out _).GetToolsFor(["Guest"]);
+
+        Assert.DoesNotContain(tools, tool => tool.Name == "ListStudents");
     }
 
     private static ChatTools CreateTools(

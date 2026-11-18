@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.AI;
+using StudentManagement.Application.Authorization;
 using StudentManagement.Application.Interfaces;
 using StudentManagement.Application.Services;
 using StudentManagement.Web.Models;
@@ -11,6 +12,11 @@ namespace StudentManagement.Web.Controllers
     public class ChatController : Controller
     {
         private static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+
+        // Chat attachments travel as base64 inside the JSON body, so cap the payload well
+        // below Kestrel's 30 MB default instead of relying on it. Exceeding the cap is a
+        // 413 from the server before any parsing happens.
+        private const long MaxRequestBytes = 10 * 1024 * 1024;
 
         private readonly IChatService _chatService;
         private readonly IEnumerable<IDocumentParser> _parsers;
@@ -29,6 +35,8 @@ namespace StudentManagement.Web.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
+        [RequestSizeLimit(MaxRequestBytes)]
         public async Task<IActionResult> Send([FromBody] ChatRequest? request, CancellationToken cancellationToken)
         {
             if (request?.Messages is null || request.Messages.Count == 0)
@@ -66,7 +74,7 @@ namespace StudentManagement.Web.Controllers
 
             try
             {
-                var reply = await _chatService.GetReplyAsync(history, cancellationToken);
+                var reply = await _chatService.GetReplyAsync(history, GetCallerRoles(), cancellationToken);
                 return Json(new { reply });
             }
             catch (Exception ex)
@@ -75,6 +83,10 @@ namespace StudentManagement.Web.Controllers
                 return StatusCode(503, new { error = "The chat service is currently unavailable. Please ensure your local AI server (Ollama, LM Studio, etc.) is running and the Chat settings in appsettings are correct." });
             }
         }
+
+        // Roles are resolved server-side from the cookie principal; the client never sends them.
+        private string[] GetCallerRoles() =>
+            AppRoles.All.Where(User.IsInRole).ToArray();
 
         private async Task<List<ChatMessage>> BuildHistoryAsync(List<ChatMessageDto> messages)
         {

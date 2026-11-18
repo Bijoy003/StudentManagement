@@ -14,7 +14,7 @@ with Identity auth, an AI chat/RAG assistant, a RAG evaluation harness, and Play
 | New migration | `dotnet ef migrations add <Name>` in Infrastructure — never run `database update` by hand |
 | RAG evaluation | `dotnet run --project StudentManagement -- evaluate --help` |
 
-Seeded admin: `admin@admin.com` / `Admin123` (and `bhugolbijoy003@gmail.com`).
+Seeded admin: `admin@admin.com` / `Admin123` (and `bhugolbijoy003@gmail.com`). Seeded teacher: `teacher@teacher.com` / `Teacher123`; seeded student: `student@student.com` / `Student123` (Student role; sees My Courses once an admin links it to a student record on Admin/Users).
 
 ## Non-negotiable rules
 

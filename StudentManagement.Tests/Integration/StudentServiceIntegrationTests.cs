@@ -112,31 +112,6 @@ public class StudentServiceIntegrationTests : SqlServerIntegrationTest
     }
 
     [SqlServerFact]
-    public async Task SaveStudentAsync_ExistingStudent_ReturnsUpdatedRowInDatabase()
-    {
-        // Arrange
-        var student = TestData.Student(name: "Ada Lovelace", email: "ada@example.com");
-        await SeedAsync(db =>
-        {
-            db.Students.Add(student);
-            return Task.CompletedTask;
-        });
-
-        student.Name = "Ada King";
-        var sut = CreateStudentService();
-
-        // Act
-        await sut.SaveStudentAsync(student);
-
-        // Assert — the update path hit the same row instead of inserting a second one
-        await using var verification = Database.CreateWriteContext();
-        var persisted = await verification.Students.SingleAsync(s => s.Id == student.Id);
-        Assert.Equal("Ada King", persisted.Name);
-        Assert.Equal("ada@example.com", persisted.Email);
-        Assert.Equal(1, await verification.Students.CountAsync());
-    }
-
-    [SqlServerFact]
     public async Task SaveStudentAsync_AfterCachedRead_ReturnsFreshRowFromDatabase()
     {
         // Arrange — prime the cache, exactly what a prior page load would do

@@ -31,10 +31,10 @@ Navigate to **Enrollments** in the top menu.
 
 When users ask about courses or enrollments, the assistant can:
 
-- List all courses or look up a course by ID
-- Show student count per course
-- List enrollments
-- List students in a course (by course ID)
-- List courses for a student (by student ID)
+- List all courses or look up a course by ID (any signed-in role)
+- Show student count per course (any signed-in role)
+- List enrollments (Admin and Teacher only)
+- List students in a course, by course ID (Admin and Teacher only)
+- List courses for a student, by student ID (Admin and Teacher only)
 
 Always use tool results for live data. Do not guess enrollment counts or student names.

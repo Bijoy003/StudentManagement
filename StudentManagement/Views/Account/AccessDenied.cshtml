@@ -3,8 +3,6 @@
 }
 
 <h2>Access Denied</h2>
-<p>Failed to login with SSO.</p>
+<p>Your account does not have permission to view this page.</p>
 
-<form method="get" asp-action="RedirectToLogin">
-    <button type="submit">Login Again</button>
-</form>
+<a class="btn btn-outline-primary" href="@Url.Action("Index", "Home")">Back to Home</a>

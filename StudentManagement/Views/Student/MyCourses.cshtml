@@ -1,0 +1,50 @@
+@model IEnumerable<Enrollment>
+
+@{
+    ViewData["Title"] = "My Courses";
+}
+
+@section Breadcrumb
+{
+    <li class="breadcrumb-item"><a href="@Url.Action("Index", "Home")">Home</a></li>
+    <li class="breadcrumb-item active" aria-current="page">My Courses</li>
+}
+
+<h2>My Courses</h2>
+<p class="text-muted">Signed in as @ViewBag.StudentName</p>
+
+@if (Model != null && Model.Any())
+{
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Course</th>
+                <th>Credits</th>
+                <th>Grade</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var enrollment in Model)
+            {
+                <tr>
+                    <td>@enrollment.Course?.Name</td>
+                    <td>@enrollment.Course?.Credits</td>
+                    <td>
+                        @if (enrollment.Grade.HasValue)
+                        {
+                            @enrollment.Grade.Value
+                        }
+                        else
+                        {
+                            <span class="text-muted">Not graded</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else
+{
+    <div class="alert alert-info">You are not enrolled in any courses yet.</div>
+}

@@ -1,10 +1,13 @@
 using System.Reflection;
+using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using StudentManagement.Application.Authorization;
 using StudentManagement.Application.Interfaces;
 using StudentManagement.Application.Services;
 using StudentManagement.Web.Controllers;
@@ -317,7 +320,7 @@ public class ChatControllerTests
     {
         var service = new Mock<IChatService>();
         service
-            .Setup(s => s.GetReplyAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetReplyAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("Ollama is down at http://localhost:11434"));
         var controller = CreateController(service);
 
@@ -337,8 +340,8 @@ public class ChatControllerTests
         CancellationToken observed = default;
         var service = new Mock<IChatService>();
         service
-            .Setup(s => s.GetReplyAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<CancellationToken>()))
-            .Callback<IReadOnlyList<ChatMessage>, CancellationToken>((_, token) => observed = token)
+            .Setup(s => s.GetReplyAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .Callback<IReadOnlyList<ChatMessage>, IReadOnlyCollection<string>, CancellationToken>((_, _, token) => observed = token)
             .ReturnsAsync("ok");
         var controller = CreateController(service);
 
@@ -351,20 +354,60 @@ public class ChatControllerTests
     }
 
     [Fact]
+    public async Task Send_WhenUserIsStudent_ReturnsStudentRoleToChatService()
+    {
+        IReadOnlyCollection<string>? observed = null;
+        var service = new Mock<IChatService>();
+        service
+            .Setup(s => s.GetReplyAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .Callback<IReadOnlyList<ChatMessage>, IReadOnlyCollection<string>, CancellationToken>((_, roles, _) => observed = roles)
+            .ReturnsAsync("ok");
+
+        var controller = CreateController(service);
+        controller.ControllerContext = CreateContext(AppRoles.Student);
+
+        await controller.Send(
+            new ChatRequest { Messages = [new ChatMessageDto { Role = "user", Text = "Hello" }] },
+            CancellationToken.None);
+
+        Assert.NotNull(observed);
+        Assert.Equal(AppRoles.Student, Assert.Single(observed!));
+    }
+
+    [Fact]
+    public async Task Send_WhenUserHasNoRoles_ReturnsEmptyRoleListToChatService()
+    {
+        IReadOnlyCollection<string>? observed = null;
+        var service = new Mock<IChatService>();
+        service
+            .Setup(s => s.GetReplyAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .Callback<IReadOnlyList<ChatMessage>, IReadOnlyCollection<string>, CancellationToken>((_, roles, _) => observed = roles)
+            .ReturnsAsync("ok");
+
+        var controller = CreateController(service);
+        controller.ControllerContext = CreateContext();
+
+        await controller.Send(
+            new ChatRequest { Messages = [new ChatMessageDto { Role = "user", Text = "Hello" }] },
+            CancellationToken.None);
+
+        Assert.NotNull(observed);
+        Assert.Empty(observed!);
+    }
+
+    [Fact]
     public void ChatController_WhenInspected_ReturnsAuthorizeAttribute()
     {
         Assert.NotNull(typeof(ChatController).GetCustomAttribute<AuthorizeAttribute>());
     }
 
     [Fact]
-    public void Send_WhenInspected_ReturnsHttpPostWithoutAntiForgeryToken()
+    public void Send_WhenInspected_ReturnsHttpPostWithAntiForgeryToken()
     {
-        // Pins the current JSON contract: chat.js sends no token. If this attribute is
-        // added, the client and this test must change together.
         var action = typeof(ChatController).GetMethod("Send");
         Assert.NotNull(action);
         Assert.NotNull(action!.GetCustomAttribute<HttpPostAttribute>());
-        Assert.Null(action.GetCustomAttribute<ValidateAntiForgeryTokenAttribute>());
+        Assert.NotNull(action.GetCustomAttribute<ValidateAntiForgeryTokenAttribute>());
     }
 
     private static ChatController CreateController(Mock<IChatService>? service = null, params IDocumentParser[] parsers)
@@ -376,15 +419,31 @@ public class ChatControllerTests
         return new ChatController(
             (service ?? new Mock<IChatService>()).Object,
             parserList,
-            NullLogger<ChatController>.Instance);
+            NullLogger<ChatController>.Instance)
+        {
+            ControllerContext = CreateContext(AppRoles.Admin)
+        };
+    }
+
+    private static ControllerContext CreateContext(params string[] roles)
+    {
+        var identity = new ClaimsIdentity(
+            roles.Select(role => new Claim(ClaimTypes.Role, role)),
+            "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+
+        return new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = principal }
+        };
     }
 
     private static Mock<IChatService> CreateChatService(string reply, Action<IReadOnlyList<ChatMessage>>? onCall = null)
     {
         var service = new Mock<IChatService>();
         service
-            .Setup(s => s.GetReplyAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<CancellationToken>()))
-            .Callback<IReadOnlyList<ChatMessage>, CancellationToken>((history, _) => onCall?.Invoke(history))
+            .Setup(s => s.GetReplyAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .Callback<IReadOnlyList<ChatMessage>, IReadOnlyCollection<string>, CancellationToken>((history, _, _) => onCall?.Invoke(history))
             .ReturnsAsync(reply);
         return service;
     }

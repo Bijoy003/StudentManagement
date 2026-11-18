@@ -1,6 +1,7 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using StudentManagement.Application.Authorization;
 using StudentManagement.Application.Configuration;
 using StudentManagement.Application.Interfaces;
 
@@ -34,9 +35,14 @@ namespace StudentManagement.Application.Services
             _logger = logger;
         }
 
-        public async Task<string> GetReplyAsync(IReadOnlyList<ChatMessage> history, CancellationToken cancellationToken = default)
+        public async Task<string> GetReplyAsync(
+            IReadOnlyList<ChatMessage> history,
+            IReadOnlyCollection<string> roles,
+            CancellationToken cancellationToken = default)
         {
             var userQuery = history.LastOrDefault(m => m.Role == ChatRole.User)?.Text ?? string.Empty;
+
+            var canUseStudentData = AppRoles.IsStaff(roles);
 
             var ragContext = _features.IncludeRag
                 ? await TryGetRagContextAsync(userQuery)
@@ -45,15 +51,15 @@ namespace StudentManagement.Application.Services
             var tools = new List<AITool>();
             if (_features.IncludeTools)
             {
-                tools.AddRange(_chatTools.GetTools());
+                tools.AddRange(_chatTools.GetToolsFor(roles));
             }
 
-            if (_mcpOptions.Enabled)
+            if (_mcpOptions.Enabled && canUseStudentData)
             {
                 tools.AddRange(await _mcpToolProvider.GetToolsAsync(cancellationToken));
             }
 
-            var systemPrompt = BuildSystemPrompt(ragContext, tools.Count > 0);
+            var systemPrompt = BuildSystemPrompt(ragContext, tools.Count > 0, canUseStudentData);
 
             var messages = new List<ChatMessage>
             {
@@ -86,7 +92,7 @@ namespace StudentManagement.Application.Services
             }
         }
 
-        private string BuildSystemPrompt(string ragContext, bool hasTools)
+        private string BuildSystemPrompt(string ragContext, bool hasTools, bool canUseStudentData)
         {
             var instructions = new List<string>
             {
@@ -96,9 +102,13 @@ namespace StudentManagement.Application.Services
             // Only instruct tool use when tools are actually declared. Small local models
             // (e.g. gemma4:e2b) otherwise emit a tool call that the provider drops, leaving
             // an empty reply.
-            if (hasTools)
+            if (hasTools && canUseStudentData)
             {
                 instructions.Add("- When the user asks for live data (students, courses, enrollments, counts, or reports), call the available tools. Do not invent records or numbers.");
+            }
+            else if (hasTools)
+            {
+                instructions.Add("- You can only look up the course catalog (course names, credits, and enrollment counts). You do not have access to student records, rosters, enrollments, or grades; say so plainly and never claim or guess those details.");
             }
 
             instructions.Add("- If a tool returns no data or an error, tell the user clearly.");
@@ -112,7 +122,7 @@ namespace StudentManagement.Application.Services
                 {string.Join(Environment.NewLine, instructions)}
                 """;
 
-            if (_mcpOptions.Enabled)
+            if (_mcpOptions.Enabled && canUseStudentData)
             {
                 prompt += """
 
