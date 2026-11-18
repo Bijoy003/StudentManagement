@@ -59,6 +59,6 @@ test.describe('Auth', () => {
   test('Access denied page renders', async ({ page }) => {
     await page.goto('/Account/AccessDenied');
     await expect(page.getByRole('heading', { name: 'Access Denied' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Login Again' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Back to Home' })).toBeVisible();
   });
 });
