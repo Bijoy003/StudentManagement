@@ -180,6 +180,12 @@ builder.Services.AddScoped<ICourseService, CourseService>();
 builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IPrimeNumberService, PrimeNumberService>();
 builder.Services.AddScoped<IArchiveService, ArchiveService>();
+builder.Services.AddScoped<IAppSettingRepository, AppSettingRepository>();
+builder.Services.AddScoped<IAppSettingsService, AppSettingsService>();
+builder.Services.AddScoped<IErrorLogRepository, ErrorLogRepository>();
+builder.Services.AddScoped<IErrorLogService, ErrorLogService>();
+builder.Services.AddScoped<IChatUsageRepository, ChatUsageRepository>();
+builder.Services.AddScoped<IChatUsageService, ChatUsageService>();
 
 // In-process domain events (observer): dispatcher + assembly-scanned handler registration.
 builder.Services.AddDomainEvents(typeof(DomainEventDispatcher).Assembly);
@@ -324,6 +330,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Persist unhandled endpoint exceptions (with user context) before the existing
+// exception handler converts them into responses.
+app.UseMiddleware<ErrorLoggingMiddleware>();
 
 app.MapControllerRoute(
     name: "default",

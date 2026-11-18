@@ -532,6 +532,61 @@ namespace StudentManagement.Tests
         }
 
         [Fact]
+        public async Task GetReplyAsync_WhenDbSettingsDisableRag_ReturnsReplyWithoutSearch()
+        {
+            // Arrange — config defaults enable RAG, but the DB-backed settings disable it
+            var mockChatClient = CreateChatClient("No RAG from DB settings.");
+            var mockKnowledge = new Mock<IAppKnowledgeService>();
+            mockKnowledge.Setup(k => k.SearchRelevantChunks(It.IsAny<string>(), It.IsAny<int>())).ReturnsAsync("unused");
+
+            var chatService = CreateService(
+                mockChatClient.Object,
+                mockKnowledge.Object,
+                new ChatFeatureOptions { IncludeRag = true },
+                settingsOverride: new ChatSettings { ChatEnabled = true, IncludeRag = false });
+
+            // Act
+            var reply = await chatService.GetReplyAsync([new ChatMessage(ChatRole.User, "How many students?")], AdminRoles);
+
+            // Assert
+            Assert.Equal("No RAG from DB settings.", reply);
+            mockKnowledge.Verify(k => k.SearchRelevantChunks(It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task GetReplyAsync_WhenDbSettingsEnableMcp_ReturnsMcpToolsForStaff()
+        {
+            // Arrange — config has MCP disabled, but the DB-backed settings enable it
+            var mockChatClient = CreateChatClient("Jira reply from DB settings.");
+            var mockKnowledge = new Mock<IAppKnowledgeService>();
+            mockKnowledge.Setup(k => k.SearchRelevantChunks(It.IsAny<string>(), It.IsAny<int>())).ReturnsAsync(string.Empty);
+
+            var mcpTool = AIFunctionFactory.Create(() => "ok", "jira_search", "Search Jira");
+            var mockMcpTools = new Mock<IMcpToolProvider>();
+            mockMcpTools
+                .Setup(m => m.GetToolsAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync([mcpTool]);
+
+            var chatService = CreateService(
+                mockChatClient.Object,
+                mockKnowledge.Object,
+                new ChatFeatureOptions { IncludeTools = false, IncludeRag = false },
+                new McpOptions { Enabled = false },
+                mockMcpTools.Object,
+                settingsOverride: new ChatSettings { McpEnabled = true, IncludeTools = false, IncludeRag = false });
+
+            // Act
+            await chatService.GetReplyAsync([new ChatMessage(ChatRole.User, "Show my Jira issues")], AdminRoles);
+
+            // Assert
+            mockMcpTools.Verify(m => m.GetToolsAsync(It.IsAny<CancellationToken>()), Times.Once);
+            mockChatClient.Verify(c => c.GetResponseAsync(
+                It.IsAny<IEnumerable<ChatMessage>>(),
+                It.Is<ChatOptions?>(o => o != null && o.Tools != null && o.Tools.Count == 1 && o.Tools[0].Name == "jira_search"),
+                It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
         public async Task GetReplyAsync_WhenProviderReturnsNoText_ReturnsEmptyString()
         {
             var mockChatClient = new Mock<IChatClient>();
@@ -636,6 +691,117 @@ namespace StudentManagement.Tests
             mockKnowledge.Verify(k => k.SearchRelevantChunks(It.IsAny<string>(), It.IsAny<int>()), Times.Never);
         }
 
+        [Fact]
+        public async Task GetReplyWithUsageAsync_ProviderReportsUsage_ReturnsUsageAndElapsed()
+        {
+            var mockChatClient = new Mock<IChatClient>();
+            mockChatClient
+                .Setup(c => c.GetResponseAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<ChatOptions?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ChatResponse(new ChatMessage(ChatRole.Assistant, "Counted reply."))
+                {
+                    Usage = new UsageDetails { InputTokenCount = 100, OutputTokenCount = 50 },
+                    AdditionalProperties = new AdditionalPropertiesDictionary { ["model"] = "qwen2.5:3b-instruct" }
+                });
+            var mockKnowledge = new Mock<IAppKnowledgeService>();
+            mockKnowledge.Setup(k => k.SearchRelevantChunks(It.IsAny<string>(), It.IsAny<int>())).ReturnsAsync(string.Empty);
+            var chatService = CreateService(mockChatClient.Object, mockKnowledge.Object, new ChatFeatureOptions { IncludeRag = false });
+
+            var result = await chatService.GetReplyWithUsageAsync([new ChatMessage(ChatRole.User, "Hello")], AdminRoles);
+
+            Assert.Equal("Counted reply.", result.Text);
+            Assert.Equal(100, result.InputTokens);
+            Assert.Equal(50, result.OutputTokens);
+            Assert.Equal("qwen2.5:3b-instruct", result.Model);
+            Assert.True(result.ElapsedMs >= 0);
+        }
+
+        [Fact]
+        public async Task GetReplyWithUsageAsync_NoUsage_ReturnsEstimatedTokens()
+        {
+            var mockChatClient = CreateChatClient("An estimated reply.");
+            var mockKnowledge = new Mock<IAppKnowledgeService>();
+            mockKnowledge.Setup(k => k.SearchRelevantChunks(It.IsAny<string>(), It.IsAny<int>())).ReturnsAsync(string.Empty);
+            var chatService = CreateService(mockChatClient.Object, mockKnowledge.Object, new ChatFeatureOptions { IncludeRag = false });
+
+            var result = await chatService.GetReplyWithUsageAsync([new ChatMessage(ChatRole.User, "Hello, how are you?")], AdminRoles);
+
+            Assert.True(result.InputTokens > 0);
+            Assert.True(result.OutputTokens > 0);
+        }
+
+        [Fact]
+        public async Task GetReplyAsync_AfterUsageRefactor_ReturnsAssistantText()
+        {
+            var mockChatClient = CreateChatClient("Still works.");
+            var mockKnowledge = new Mock<IAppKnowledgeService>();
+            mockKnowledge.Setup(k => k.SearchRelevantChunks(It.IsAny<string>(), It.IsAny<int>())).ReturnsAsync(string.Empty);
+            var chatService = CreateService(mockChatClient.Object, mockKnowledge.Object, new ChatFeatureOptions { IncludeRag = false });
+
+            var reply = await chatService.GetReplyAsync([new ChatMessage(ChatRole.User, "Hello")], AdminRoles);
+
+            Assert.Equal("Still works.", reply);
+        }
+
+        [Fact]
+        public async Task GetReplyAsync_LinkedStudent_ReturnsSelfToolsInOptions()
+        {
+            var mockChatClient = CreateChatClient("Own data.");
+            var mockKnowledge = new Mock<IAppKnowledgeService>();
+            mockKnowledge.Setup(k => k.SearchRelevantChunks(It.IsAny<string>(), It.IsAny<int>())).ReturnsAsync(string.Empty);
+
+            ChatOptions? captured = null;
+            mockChatClient
+                .Setup(c => c.GetResponseAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<ChatOptions?>(), It.IsAny<CancellationToken>()))
+                .Callback<IEnumerable<ChatMessage>, ChatOptions?, CancellationToken>((_, options, _) => captured = options)
+                .ReturnsAsync(new ChatResponse(new ChatMessage(ChatRole.Assistant, "Own data.")));
+
+            var chatService = CreateService(
+                mockChatClient.Object,
+                mockKnowledge.Object,
+                new ChatFeatureOptions { IncludeTools = true, IncludeRag = false });
+
+            await chatService.GetReplyAsync(
+                [new ChatMessage(ChatRole.User, "What are my grades?")],
+                [AppRoles.Student],
+                linkedStudentId: 5);
+
+            Assert.NotNull(captured?.Tools);
+            var names = captured!.Tools!.Select(t => t.Name).ToList();
+            Assert.Contains("GetMyCourses", names);
+            Assert.Contains("GetMyGrades", names);
+            Assert.Contains("GetMyProfile", names);
+            Assert.DoesNotContain("ListStudents", names);
+        }
+
+        [Fact]
+        public async Task GetReplyAsync_LinkedStudent_ReturnsOwnDataPromptInstruction()
+        {
+            var mockChatClient = CreateChatClient("Own data.");
+            var mockKnowledge = new Mock<IAppKnowledgeService>();
+            mockKnowledge.Setup(k => k.SearchRelevantChunks(It.IsAny<string>(), It.IsAny<int>())).ReturnsAsync(string.Empty);
+
+            string? systemPrompt = null;
+            mockChatClient
+                .Setup(c => c.GetResponseAsync(It.IsAny<IEnumerable<ChatMessage>>(), It.IsAny<ChatOptions?>(), It.IsAny<CancellationToken>()))
+                .Callback<IEnumerable<ChatMessage>, ChatOptions?, CancellationToken>((messages, _, _) =>
+                    systemPrompt = messages.First(m => m.Role == ChatRole.System).Text)
+                .ReturnsAsync(new ChatResponse(new ChatMessage(ChatRole.Assistant, "Own data.")));
+
+            var chatService = CreateService(
+                mockChatClient.Object,
+                mockKnowledge.Object,
+                new ChatFeatureOptions { IncludeTools = true, IncludeRag = false });
+
+            await chatService.GetReplyAsync(
+                [new ChatMessage(ChatRole.User, "What are my grades?")],
+                [AppRoles.Student],
+                linkedStudentId: 5);
+
+            Assert.NotNull(systemPrompt);
+            Assert.Contains("signed-in student", systemPrompt, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("do not have access to student records", systemPrompt, StringComparison.OrdinalIgnoreCase);
+        }
+
         private static Mock<IChatClient> CreateChatClient(string reply)
         {
             var mockChatClient = new Mock<IChatClient>();
@@ -653,20 +819,35 @@ namespace StudentManagement.Tests
             IAppKnowledgeService knowledge,
             ChatFeatureOptions? features = null,
             McpOptions? mcpOptions = null,
-            IMcpToolProvider? mcpToolProvider = null)
+            IMcpToolProvider? mcpToolProvider = null,
+            ChatSettings? settingsOverride = null)
         {
             var chatTools = new ChatTools(
                 Mock.Of<IStudentService>(),
                 Mock.Of<ICourseService>(),
                 Mock.Of<IEnrollmentService>());
 
+            var effectiveFeatures = features ?? new ChatFeatureOptions();
+            var settings = settingsOverride ?? new ChatSettings
+            {
+                ChatEnabled = true,
+                IncludeRag = effectiveFeatures.IncludeRag,
+                IncludeTools = effectiveFeatures.IncludeTools,
+                IncludeFullDocumentation = effectiveFeatures.IncludeFullDocumentation,
+                MaxRagChunks = effectiveFeatures.MaxRagChunks,
+                McpEnabled = (mcpOptions ?? new McpOptions()).Enabled,
+                DailyTokenLimit = 20000
+            };
+
+            var appSettings = new Mock<IAppSettingsService>();
+            appSettings.Setup(s => s.GetChatSettingsAsync(It.IsAny<CancellationToken>())).ReturnsAsync(settings);
+
             return new ChatService(
                 chatClient,
                 knowledge,
                 chatTools,
                 mcpToolProvider ?? Mock.Of<IMcpToolProvider>(),
-                Options.Create(features ?? new ChatFeatureOptions()),
-                Options.Create(mcpOptions ?? new McpOptions()),
+                appSettings.Object,
                 Mock.Of<ILogger<ChatService>>());
         }
     }

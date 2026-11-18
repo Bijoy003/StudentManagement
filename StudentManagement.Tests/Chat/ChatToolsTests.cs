@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.AI;
 using Moq;
 using StudentManagement.Application.Authorization;
 using StudentManagement.Application.Interfaces;
@@ -321,6 +322,99 @@ public class ChatToolsTests
         var tools = CreateTools(out _, out _, out _).GetToolsFor(["Guest"]);
 
         Assert.DoesNotContain(tools, tool => tool.Name == "ListStudents");
+    }
+
+    [Fact]
+    public void GetToolsFor_LinkedStudent_ReturnsCatalogPlusSelfTools()
+    {
+        var tools = CreateTools(out _, out _, out _).GetToolsFor([AppRoles.Student], linkedStudentId: 5);
+
+        var names = tools.Select(t => t.Name).OrderBy(n => n).ToList();
+        Assert.Equal(
+            new[] { "GetCourseById", "GetMyCourses", "GetMyGrades", "GetMyProfile", "GetStudentCountPerCourse", "ListCourses" },
+            names);
+        Assert.DoesNotContain(tools, tool => tool.Name == "ListStudents");
+    }
+
+    [Fact]
+    public void GetToolsFor_LinkedStaff_ReturnsStaffToolsWithoutSelfTools()
+    {
+        var tools = CreateTools(out _, out _, out _).GetToolsFor([AppRoles.Admin], linkedStudentId: 5);
+
+        Assert.Equal(9, tools.Count);
+        Assert.DoesNotContain(tools, tool => tool.Name == "GetMyCourses");
+    }
+
+    [Fact]
+    public async Task GetMyCoursesAsync_LinkedStudent_ReturnsOwnCoursesJson()
+    {
+        var tools = CreateTools(out _, out _, out var enrollments);
+        enrollments
+            .Setup(e => e.GetCoursesForStudent(5))
+            .ReturnsAsync([new Course { Id = 3, Name = "Algebra", Credits = 4 }]);
+
+        var json = ChatJson.Parse(await tools.GetMyCoursesAsync(5));
+
+        var course = Assert.Single(json.EnumerateArray());
+        Assert.Equal(3, course.GetProperty("Id").GetInt32());
+        Assert.Equal("Algebra", course.GetProperty("Name").GetString());
+        enrollments.Verify(e => e.GetCoursesForStudent(5), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetMyGradesAsync_MixedEnrollments_ReturnsOnlyOwnGrades()
+    {
+        var tools = CreateTools(out _, out _, out var enrollments);
+        enrollments
+            .Setup(e => e.GetEnrollments())
+            .ReturnsAsync(
+            [
+                new Enrollment { StudentId = 5, CourseId = 3, Grade = 3.5m, Course = new Course { Id = 3, Name = "Algebra" } },
+                new Enrollment { StudentId = 9, CourseId = 3, Grade = 4.0m, Course = new Course { Id = 3, Name = "Algebra" } },
+                new Enrollment { StudentId = 5, CourseId = 4, Grade = null, Course = new Course { Id = 4, Name = "Geometry" } }
+            ]);
+
+        var json = ChatJson.Parse(await tools.GetMyGradesAsync(5));
+
+        Assert.Equal(2, json.GetArrayLength());
+        Assert.All(json.EnumerateArray(), entry => Assert.DoesNotContain("9", entry.GetProperty("CourseId").ToString()));
+        Assert.Equal("Algebra", json[0].GetProperty("CourseName").GetString());
+        Assert.Equal(3.5m, json[0].GetProperty("Grade").GetDecimal());
+        Assert.Equal(JsonValueKind.Null, json[1].GetProperty("Grade").ValueKind);
+    }
+
+    [Fact]
+    public async Task GetMyProfileAsync_LinkedStudent_ReturnsOwnRecordJson()
+    {
+        var tools = CreateTools(out var students, out _, out _);
+        students
+            .Setup(s => s.GetStudentByIdAsync(5))
+            .ReturnsAsync(new Student { Id = 5, Name = "Ada", Email = "ada@example.com" });
+
+        var json = ChatJson.Parse(await tools.GetMyProfileAsync(5));
+
+        Assert.Equal(5, json.GetProperty("Id").GetInt32());
+        Assert.Equal("Ada", json.GetProperty("Name").GetString());
+    }
+
+    [Fact]
+    public async Task GetMyCoursesTool_InjectedStudentIdArgument_ReturnsOwnDataOnly()
+    {
+        var tools = CreateTools(out _, out _, out var enrollments);
+        enrollments
+            .Setup(e => e.GetCoursesForStudent(5))
+            .ReturnsAsync([new Course { Id = 3, Name = "Algebra", Credits = 4 }]);
+        var tool = (AIFunction)tools.GetToolsFor([AppRoles.Student], linkedStudentId: 5)
+            .Single(t => t.Name == "GetMyCourses");
+
+        // The model cannot override the bound student id: extra arguments are ignored.
+        var result = await tool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?> { ["studentId"] = 999 }));
+
+        // The tool's JSON string comes back marshalled as a JsonElement string value.
+        var json = ChatJson.Parse(Assert.IsType<JsonElement>(result).GetString()!);
+        Assert.Equal("Algebra", Assert.Single(json.EnumerateArray()).GetProperty("Name").GetString());
+        enrollments.Verify(e => e.GetCoursesForStudent(5), Times.Once);
+        enrollments.Verify(e => e.GetCoursesForStudent(999), Times.Never);
     }
 
     private static ChatTools CreateTools(

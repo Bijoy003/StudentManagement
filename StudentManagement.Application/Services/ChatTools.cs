@@ -28,7 +28,11 @@ namespace StudentManagement.Application.Services
 
         // Student and User callers get the course catalog only: rosters, enrollments and
         // grades stay out of reach until the signed-in account is linked to a student record.
-        public IList<AITool> GetToolsFor(IEnumerable<string>? roles)
+        public IList<AITool> GetToolsFor(IEnumerable<string>? roles) => GetToolsFor(roles, null);
+
+        // A linked non-staff caller additionally gets self-scoped tools. The student id is
+        // bound server-side into the delegate: the model cannot ask for another student's data.
+        public IList<AITool> GetToolsFor(IEnumerable<string>? roles, int? linkedStudentId)
         {
             var tools = new List<AITool>
             {
@@ -37,19 +41,69 @@ namespace StudentManagement.Application.Services
                 AIFunctionFactory.Create(GetStudentCountPerCourseAsync)
             };
 
-            if (!AppRoles.IsStaff(roles))
+            if (AppRoles.IsStaff(roles))
             {
+                tools.Add(AIFunctionFactory.Create(ListStudentsAsync));
+                tools.Add(AIFunctionFactory.Create(GetStudentByIdAsync));
+                tools.Add(AIFunctionFactory.Create(GetStudentsEnrolledInMoreThanAsync));
+                tools.Add(AIFunctionFactory.Create(ListEnrollmentsAsync));
+                tools.Add(AIFunctionFactory.Create(GetStudentsInCourseAsync));
+                tools.Add(AIFunctionFactory.Create(GetCoursesForStudentAsync));
                 return tools;
             }
 
-            tools.Add(AIFunctionFactory.Create(ListStudentsAsync));
-            tools.Add(AIFunctionFactory.Create(GetStudentByIdAsync));
-            tools.Add(AIFunctionFactory.Create(GetStudentsEnrolledInMoreThanAsync));
-            tools.Add(AIFunctionFactory.Create(ListEnrollmentsAsync));
-            tools.Add(AIFunctionFactory.Create(GetStudentsInCourseAsync));
-            tools.Add(AIFunctionFactory.Create(GetCoursesForStudentAsync));
+            if (linkedStudentId is int studentId)
+            {
+                tools.Add(AIFunctionFactory.Create(
+                    () => GetMyCoursesAsync(studentId),
+                    "GetMyCourses",
+                    "Lists the signed-in student's own enrolled courses with id, name, and credits."));
+                tools.Add(AIFunctionFactory.Create(
+                    () => GetMyGradesAsync(studentId),
+                    "GetMyGrades",
+                    "Lists the signed-in student's own courses with their grades."));
+                tools.Add(AIFunctionFactory.Create(
+                    () => GetMyProfileAsync(studentId),
+                    "GetMyProfile",
+                    "Gets the signed-in student's own profile: name, email, phone, address, and enrollment date."));
+            }
 
             return tools;
+        }
+
+        public async Task<string> GetMyCoursesAsync(int studentId)
+        {
+            var courses = await _enrollmentService.GetCoursesForStudent(studentId);
+            var result = courses.Select(c => new { c.Id, c.Name, c.Credits });
+            return JsonSerializer.Serialize(result, JsonOptions);
+        }
+
+        public async Task<string> GetMyGradesAsync(int studentId)
+        {
+            var enrollments = await _enrollmentService.GetEnrollments();
+            var result = enrollments
+                .Where(e => e.StudentId == studentId)
+                .Select(e => new { e.CourseId, CourseName = e.Course?.Name, e.Grade });
+            return JsonSerializer.Serialize(result, JsonOptions);
+        }
+
+        public async Task<string> GetMyProfileAsync(int studentId)
+        {
+            var student = await _studentService.GetStudentByIdAsync(studentId);
+            if (student is null)
+            {
+                return JsonSerializer.Serialize(new { error = "Your student record could not be found. Ask an administrator to check your account link." });
+            }
+
+            return JsonSerializer.Serialize(new
+            {
+                student.Id,
+                student.Name,
+                student.Email,
+                student.Phone,
+                student.Address,
+                DateOfEnroll = student.DateOfEnroll?.ToString("yyyy-MM-dd")
+            }, JsonOptions);
         }
 
         [Description("Lists all students with id, name, email, phone, address, and enrollment date.")]

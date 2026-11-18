@@ -108,13 +108,17 @@ public class ChatContractTests
 
         var invoking = new FunctionInvokingChatClient(inner);
 
+        var appSettings = new Mock<IAppSettingsService>();
+        appSettings
+            .Setup(s => s.GetChatSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ChatSettings { IncludeTools = true, McpEnabled = false });
+
         var service = new ChatService(
             invoking,
             knowledge.Object,
             tools,
             Mock.Of<IMcpToolProvider>(),
-            Options.Create(new ChatFeatureOptions { IncludeTools = true }),
-            Options.Create(new McpOptions { Enabled = false }),
+            appSettings.Object,
             NullLogger<ChatService>.Instance);
 
         return new Pipeline(service, inner, students);

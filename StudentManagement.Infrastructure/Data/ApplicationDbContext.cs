@@ -26,6 +26,9 @@ namespace StudentManagement.Infrastructure.Data
         public DbSet<Enrollment> Enrollments { get; set; }
         public DbSet<StudentArchive> StudentsArchive { get; set; }
         public DbSet<EnrollmentArchive> EnrollmentsArchive { get; set; }
+        public DbSet<AppSetting> AppSettings { get; set; }
+        public DbSet<ChatUsageLog> ChatUsageLogs { get; set; }
+        public DbSet<ErrorLog> ErrorLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -40,6 +43,13 @@ namespace StudentManagement.Infrastructure.Data
             builder.Entity<ApplicationUser>()
                 .HasIndex(user => user.StudentId)
                 .IsUnique();
+
+            // Daily quota lookups always filter by user + UTC day.
+            builder.Entity<ChatUsageLog>()
+                .HasIndex(log => new { log.UserId, log.UsageDateUtc });
+
+            builder.Entity<ErrorLog>()
+                .HasIndex(log => log.TimestampUtc);
         }
     }
 }

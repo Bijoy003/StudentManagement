@@ -3,15 +3,20 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using StudentManagement.Application.Authorization;
+using StudentManagement.Application.Configuration;
 using StudentManagement.Application.Interfaces;
 using StudentManagement.Application.Services;
+using StudentManagement.Infrastructure.Data;
 using StudentManagement.Web.Controllers;
 using StudentManagement.Web.Models;
+using ChatOptions = StudentManagement.Configuration.ChatOptions;
 
 namespace StudentManagement.Tests;
 
@@ -123,7 +128,7 @@ public class ChatControllerTests
     {
         IReadOnlyList<ChatMessage>? captured = null;
         var service = CreateChatService("ok", history => captured = history);
-        var controller = CreateController(service, new TxtDocumentParser());
+        var controller = CreateController(service, parsers: new TxtDocumentParser());
         var base64 = Base64("file body");
 
         await controller.Send(
@@ -145,7 +150,7 @@ public class ChatControllerTests
     {
         IReadOnlyList<ChatMessage>? captured = null;
         var service = CreateChatService("ok", history => captured = history);
-        var controller = CreateController(service, new TxtDocumentParser());
+        var controller = CreateController(service, parsers: new TxtDocumentParser());
 
         await controller.Send(
             new ChatRequest
@@ -171,7 +176,7 @@ public class ChatControllerTests
     {
         IReadOnlyList<ChatMessage>? captured = null;
         var service = CreateChatService("ok", history => captured = history);
-        var controller = CreateController(service, new TxtDocumentParser());
+        var controller = CreateController(service, parsers: new TxtDocumentParser());
 
         await controller.Send(
             new ChatRequest
@@ -320,7 +325,7 @@ public class ChatControllerTests
     {
         var service = new Mock<IChatService>();
         service
-            .Setup(s => s.GetReplyAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GetReplyWithUsageAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>(), It.IsAny<int?>()))
             .ThrowsAsync(new HttpRequestException("Ollama is down at http://localhost:11434"));
         var controller = CreateController(service);
 
@@ -340,9 +345,9 @@ public class ChatControllerTests
         CancellationToken observed = default;
         var service = new Mock<IChatService>();
         service
-            .Setup(s => s.GetReplyAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
-            .Callback<IReadOnlyList<ChatMessage>, IReadOnlyCollection<string>, CancellationToken>((_, _, token) => observed = token)
-            .ReturnsAsync("ok");
+            .Setup(s => s.GetReplyWithUsageAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>(), It.IsAny<int?>()))
+            .Callback<IReadOnlyList<ChatMessage>, IReadOnlyCollection<string>, CancellationToken, int?>((_, _, token, _) => observed = token)
+            .ReturnsAsync(new ChatReplyResult("ok", 1, 1, 1, "test-model"));
         var controller = CreateController(service);
 
         using var cts = new CancellationTokenSource();
@@ -359,9 +364,9 @@ public class ChatControllerTests
         IReadOnlyCollection<string>? observed = null;
         var service = new Mock<IChatService>();
         service
-            .Setup(s => s.GetReplyAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
-            .Callback<IReadOnlyList<ChatMessage>, IReadOnlyCollection<string>, CancellationToken>((_, roles, _) => observed = roles)
-            .ReturnsAsync("ok");
+            .Setup(s => s.GetReplyWithUsageAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>(), It.IsAny<int?>()))
+            .Callback<IReadOnlyList<ChatMessage>, IReadOnlyCollection<string>, CancellationToken, int?>((_, roles, _, _) => observed = roles)
+            .ReturnsAsync(new ChatReplyResult("ok", 1, 1, 1, "test-model"));
 
         var controller = CreateController(service);
         controller.ControllerContext = CreateContext(AppRoles.Student);
@@ -380,9 +385,9 @@ public class ChatControllerTests
         IReadOnlyCollection<string>? observed = null;
         var service = new Mock<IChatService>();
         service
-            .Setup(s => s.GetReplyAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
-            .Callback<IReadOnlyList<ChatMessage>, IReadOnlyCollection<string>, CancellationToken>((_, roles, _) => observed = roles)
-            .ReturnsAsync("ok");
+            .Setup(s => s.GetReplyWithUsageAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>(), It.IsAny<int?>()))
+            .Callback<IReadOnlyList<ChatMessage>, IReadOnlyCollection<string>, CancellationToken, int?>((_, roles, _, _) => observed = roles)
+            .ReturnsAsync(new ChatReplyResult("ok", 1, 1, 1, "test-model"));
 
         var controller = CreateController(service);
         controller.ControllerContext = CreateContext();
@@ -410,20 +415,362 @@ public class ChatControllerTests
         Assert.NotNull(action.GetCustomAttribute<ValidateAntiForgeryTokenAttribute>());
     }
 
-    private static ChatController CreateController(Mock<IChatService>? service = null, params IDocumentParser[] parsers)
+    [Fact]
+    public async Task Send_ChatDisabled_Returns503()
+    {
+        var service = new Mock<IChatService>();
+        var controller = CreateController(service, settings: new ChatSettings { ChatEnabled = false });
+
+        var result = await controller.Send(
+            new ChatRequest { Messages = [new ChatMessageDto { Role = "user", Text = "Hello" }] },
+            CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(503, objectResult.StatusCode);
+        Assert.Equal("Chat is currently disabled by the administrator.", ReadError(result));
+        service.Verify(
+            s => s.GetReplyWithUsageAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>(), It.IsAny<int?>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Send_QuotaExceeded_Returns429()
+    {
+        var service = new Mock<IChatService>();
+        var usage = CreateUsageService(new ChatQuotaStatus(20000, 20000, false, DateTime.UtcNow.Date.AddDays(1)));
+        var controller = CreateController(service, usage: usage);
+        controller.ControllerContext = CreateContextWithUser("user-1", AppRoles.Student);
+
+        var result = await controller.Send(
+            new ChatRequest { Messages = [new ChatMessageDto { Role = "user", Text = "Hello" }] },
+            CancellationToken.None);
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(429, objectResult.StatusCode);
+        Assert.Contains("limit", ReadError(result), StringComparison.OrdinalIgnoreCase);
+        service.Verify(
+            s => s.GetReplyWithUsageAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>(), It.IsAny<int?>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Send_AdminSuccess_ReturnsReplyAndRecordsUsage()
+    {
+        var service = CreateChatService("Admin reply.");
+        var usage = CreateUsageService(new ChatQuotaStatus(0, 20000, true, DateTime.UtcNow.Date.AddDays(1)));
+        var controller = CreateController(service, usage: usage);
+        controller.ControllerContext = CreateContextWithUser("admin-1", AppRoles.Admin);
+
+        var result = await controller.Send(
+            new ChatRequest { Messages = [new ChatMessageDto { Role = "user", Text = "Hello" }] },
+            CancellationToken.None);
+
+        Assert.Equal("Admin reply.", ReadReply(result));
+        usage.Verify(u => u.RecordAsync("admin-1", 10, 5, "test-model", 42, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Send_NonAdminSuccess_ReturnsQuotaInJson()
+    {
+        var service = CreateChatService("Student reply.");
+        var usage = CreateUsageService(new ChatQuotaStatus(300, 20000, false, DateTime.UtcNow.Date.AddDays(1)));
+        var controller = CreateController(service, usage: usage);
+        controller.ControllerContext = CreateContextWithUser("user-1", AppRoles.Student);
+
+        var result = await controller.Send(
+            new ChatRequest { Messages = [new ChatMessageDto { Role = "user", Text = "Hello" }] },
+            CancellationToken.None);
+
+        var value = Assert.IsType<JsonResult>(result).Value;
+        Assert.Equal(42L, ReadProperty<long>(value!, "elapsedMs"));
+        var quota = value!.GetType().GetProperty("quota")!.GetValue(value);
+        Assert.NotNull(quota);
+        Assert.Equal(315, ReadProperty<int>(quota!, "used"));
+        Assert.Equal(20000, ReadProperty<int>(quota!, "limit"));
+        Assert.Equal(19685, ReadProperty<int>(quota!, "remaining"));
+        usage.Verify(u => u.RecordAsync("user-1", 10, 5, "test-model", 42, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Index_NonAdmin_ReturnsQuotaViewModel()
+    {
+        var usage = CreateUsageService(new ChatQuotaStatus(300, 20000, false, DateTime.UtcNow.Date.AddDays(1)));
+        var controller = CreateController(usage: usage);
+        controller.ControllerContext = CreateContextWithUser("user-1", AppRoles.Student);
+
+        var result = await controller.Index();
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ChatIndexViewModel>(view.Model);
+        Assert.False(model.Unlimited);
+        Assert.Equal(300, model.UsedToday);
+        Assert.Equal(20000, model.DailyLimit);
+        Assert.True(model.ChatEnabled);
+    }
+
+    [Fact]
+    public async Task Send_ProviderFailure_Returns503AndLogsError()
+    {
+        var service = new Mock<IChatService>();
+        var failure = new HttpRequestException("Ollama is down");
+        service
+            .Setup(s => s.GetReplyWithUsageAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>(), It.IsAny<int?>()))
+            .ThrowsAsync(failure);
+        var errorLog = new Mock<IErrorLogService>();
+        errorLog
+            .Setup(s => s.LogAsync(It.IsAny<string>(), It.IsAny<Exception>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        var controller = CreateController(service, errorLog: errorLog);
+
+        var result = await controller.Send(
+            new ChatRequest { Messages = [new ChatMessageDto { Role = "user", Text = "Hello" }] },
+            CancellationToken.None);
+
+        Assert.Equal(503, Assert.IsType<ObjectResult>(result).StatusCode);
+        errorLog.Verify(s => s.LogAsync(
+            "Chat/Send",
+            failure,
+            It.IsAny<string?>(),
+            It.IsAny<string?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Send_LinkedStudent_ReturnsLinkedStudentIdToService()
+    {
+        int? observedStudentId = null;
+        var service = new Mock<IChatService>();
+        service
+            .Setup(s => s.GetReplyWithUsageAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>(), It.IsAny<int?>()))
+            .Callback<IReadOnlyList<ChatMessage>, IReadOnlyCollection<string>, CancellationToken, int?>((_, _, _, studentId) => observedStudentId = studentId)
+            .ReturnsAsync(new ChatReplyResult("ok", 1, 1, 1, "test-model"));
+        var userManager = CreateUserManager(new ApplicationUser { Id = "user-1", StudentId = 5 });
+        var controller = CreateController(service, userManager: userManager);
+        controller.ControllerContext = CreateContextWithUser("user-1", AppRoles.Student);
+
+        await controller.Send(
+            new ChatRequest { Messages = [new ChatMessageDto { Role = "user", Text = "My grades?" }] },
+            CancellationToken.None);
+
+        Assert.Equal(5, observedStudentId);
+    }
+
+    [Fact]
+    public async Task Index_LinkedStudent_ReturnsSelfServiceHint()
+    {
+        var userManager = CreateUserManager(new ApplicationUser { Id = "user-1", StudentId = 5 });
+        var controller = CreateController(settings: new ChatSettings { IncludeTools = true }, userManager: userManager);
+        controller.ControllerContext = CreateContextWithUser("user-1", AppRoles.Student);
+
+        var result = await controller.Index();
+
+        var model = Assert.IsType<ChatIndexViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.True(model.HasStudentLink);
+        Assert.Equal(AppRoles.Student, model.Role);
+        Assert.Contains("your own", model.CapabilityHint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Index_UnlinkedStudent_ReturnsLinkAccountHint()
+    {
+        var userManager = CreateUserManager(new ApplicationUser { Id = "user-1", StudentId = null });
+        var controller = CreateController(settings: new ChatSettings { IncludeTools = true }, userManager: userManager);
+        controller.ControllerContext = CreateContextWithUser("user-1", AppRoles.Student);
+
+        var result = await controller.Index();
+
+        var model = Assert.IsType<ChatIndexViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.False(model.HasStudentLink);
+        Assert.Contains("link", model.CapabilityHint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SendStream_ValidRequest_ReturnsStatusDeltaDoneFrames()
+    {
+        var service = new Mock<IChatService>();
+        service
+            .Setup(s => s.StreamReplyAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>(), It.IsAny<int?>()))
+            .Returns(StreamEvents(
+                new ChatStatusEvent("Generating reply…"),
+                new ChatDeltaEvent("Hello"),
+                new ChatDoneEvent(42, 10, 5)));
+        var usage = CreateUsageService(new ChatQuotaStatus(0, 20000, true, DateTime.UtcNow.Date.AddDays(1)));
+        var controller = CreateController(service, usage: usage);
+        controller.ControllerContext = CreateContextWithUser("admin-1", AppRoles.Admin);
+        controller.HttpContext.Response.Body = new MemoryStream();
+
+        var result = await controller.SendStream(
+            new ChatRequest { Messages = [new ChatMessageDto { Role = "user", Text = "Hello" }] },
+            CancellationToken.None);
+
+        Assert.IsType<EmptyResult>(result);
+        Assert.Equal("text/event-stream", controller.HttpContext.Response.ContentType);
+        var frames = ReadSseFrames(controller.HttpContext);
+        Assert.Equal(3, frames.Count);
+        Assert.Equal("status", frames[0].RootElement.GetProperty("type").GetString());
+        Assert.Equal("delta", frames[1].RootElement.GetProperty("type").GetString());
+        Assert.Equal("Hello", frames[1].RootElement.GetProperty("text").GetString());
+        var done = frames[2].RootElement;
+        Assert.Equal("done", done.GetProperty("type").GetString());
+        Assert.Equal(42, done.GetProperty("elapsedMs").GetInt64());
+        Assert.Equal(15, done.GetProperty("quota").GetProperty("used").GetInt32());
+        usage.Verify(u => u.RecordAsync("admin-1", 10, 5, "test-model", 42, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SendStream_QuotaExceeded_Returns429()
+    {
+        var service = new Mock<IChatService>();
+        var usage = CreateUsageService(new ChatQuotaStatus(20000, 20000, false, DateTime.UtcNow.Date.AddDays(1)));
+        var controller = CreateController(service, usage: usage);
+        controller.ControllerContext = CreateContextWithUser("user-1", AppRoles.Student);
+
+        var result = await controller.SendStream(
+            new ChatRequest { Messages = [new ChatMessageDto { Role = "user", Text = "Hello" }] },
+            CancellationToken.None);
+
+        Assert.Equal(429, Assert.IsType<ObjectResult>(result).StatusCode);
+        service.Verify(
+            s => s.StreamReplyAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>(), It.IsAny<int?>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task SendStream_ChatDisabled_Returns503()
+    {
+        var controller = CreateController(settings: new ChatSettings { ChatEnabled = false });
+
+        var result = await controller.SendStream(
+            new ChatRequest { Messages = [new ChatMessageDto { Role = "user", Text = "Hello" }] },
+            CancellationToken.None);
+
+        Assert.Equal(503, Assert.IsType<ObjectResult>(result).StatusCode);
+        Assert.Equal("Chat is currently disabled by the administrator.", ReadError(result));
+    }
+
+    [Fact]
+    public async Task SendStream_StreamThrows_ReturnsErrorFrameAndLogs()
+    {
+        var service = new Mock<IChatService>();
+        service
+            .Setup(s => s.StreamReplyAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>(), It.IsAny<int?>()))
+            .Returns(FailingStream());
+        var errorLog = new Mock<IErrorLogService>();
+        errorLog
+            .Setup(s => s.LogAsync(It.IsAny<string>(), It.IsAny<Exception>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        var controller = CreateController(service, errorLog: errorLog);
+        controller.ControllerContext = CreateContextWithUser("user-1", AppRoles.Student);
+        controller.HttpContext.Response.Body = new MemoryStream();
+
+        await controller.SendStream(
+            new ChatRequest { Messages = [new ChatMessageDto { Role = "user", Text = "Hello" }] },
+            CancellationToken.None);
+
+        var frames = ReadSseFrames(controller.HttpContext);
+        Assert.Contains(frames, f => f.RootElement.GetProperty("type").GetString() == "error");
+        errorLog.Verify(s => s.LogAsync(
+            "Chat/SendStream",
+            It.IsAny<InvalidOperationException>(),
+            "user-1",
+            It.IsAny<string?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    private static async IAsyncEnumerable<ChatEvent> StreamEvents(params ChatEvent[] events)
+    {
+        foreach (var chatEvent in events)
+        {
+            yield return chatEvent;
+            await Task.Yield();
+        }
+    }
+
+    private static async IAsyncEnumerable<ChatEvent> FailingStream()
+    {
+        yield return new ChatStatusEvent("Generating reply…");
+        await Task.Yield();
+        throw new InvalidOperationException("Provider down");
+    }
+
+    private static List<System.Text.Json.JsonDocument> ReadSseFrames(HttpContext context)
+    {
+        context.Response.Body.Position = 0;
+        using var reader = new StreamReader(context.Response.Body, leaveOpen: true);
+        var body = reader.ReadToEnd();
+        return body.Split("\n\n", StringSplitOptions.RemoveEmptyEntries)
+            .Where(frame => frame.StartsWith("data: "))
+            .Select(frame => System.Text.Json.JsonDocument.Parse(frame["data: ".Length..]))
+            .ToList();
+    }
+
+    private static Mock<UserManager<ApplicationUser>> CreateUserManager(ApplicationUser? user = null)
+    {
+        var manager = new Mock<UserManager<ApplicationUser>>(
+            Mock.Of<IUserStore<ApplicationUser>>(), null!, null!, null!, null!, null!, null!, null!, null!);
+        manager
+            .Setup(m => m.GetUserAsync(It.IsAny<ClaimsPrincipal>()))
+            .ReturnsAsync(user);
+        return manager;
+    }
+
+    private static ChatController CreateController(
+        Mock<IChatService>? service = null,
+        ChatSettings? settings = null,
+        Mock<IErrorLogService>? errorLog = null,
+        Mock<IChatUsageService>? usage = null,
+        Mock<UserManager<ApplicationUser>>? userManager = null,
+        params IDocumentParser[] parsers)
     {
         IDocumentParser[] parserList = parsers.Length == 0
             ? new IDocumentParser[] { new TxtDocumentParser() }
             : parsers;
 
+        var appSettings = new Mock<IAppSettingsService>();
+        appSettings
+            .Setup(s => s.GetChatSettingsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(settings ?? new ChatSettings { ChatEnabled = true });
+
         return new ChatController(
             (service ?? new Mock<IChatService>()).Object,
             parserList,
+            appSettings.Object,
+            (errorLog ?? new Mock<IErrorLogService>()).Object,
+            (usage ?? CreateUsageService(new ChatQuotaStatus(0, 20000, false, DateTime.UtcNow.Date.AddDays(1)))).Object,
+            Options.Create(new ChatOptions { Model = "test-model" }),
+            (userManager ?? CreateUserManager()).Object,
             NullLogger<ChatController>.Instance)
         {
             ControllerContext = CreateContext(AppRoles.Admin)
         };
     }
+
+    private static Mock<IChatUsageService> CreateUsageService(ChatQuotaStatus status)
+    {
+        var usage = new Mock<IChatUsageService>();
+        usage
+            .Setup(u => u.GetQuotaStatusAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(status);
+        usage
+            .Setup(u => u.RecordAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        return usage;
+    }
+
+    private static ControllerContext CreateContextWithUser(string userId, params string[] roles)
+    {
+        var claims = roles.Select(role => new Claim(ClaimTypes.Role, role)).ToList();
+        claims.Add(new Claim(ClaimTypes.NameIdentifier, userId));
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+
+        return new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) }
+        };
+    }
+
+    private static T ReadProperty<T>(object value, string name) =>
+        (T)value.GetType().GetProperty(name)!.GetValue(value)!;
 
     private static ControllerContext CreateContext(params string[] roles)
     {
@@ -442,9 +789,9 @@ public class ChatControllerTests
     {
         var service = new Mock<IChatService>();
         service
-            .Setup(s => s.GetReplyAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
-            .Callback<IReadOnlyList<ChatMessage>, IReadOnlyCollection<string>, CancellationToken>((history, _, _) => onCall?.Invoke(history))
-            .ReturnsAsync(reply);
+            .Setup(s => s.GetReplyWithUsageAsync(It.IsAny<IReadOnlyList<ChatMessage>>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>(), It.IsAny<int?>()))
+            .Callback<IReadOnlyList<ChatMessage>, IReadOnlyCollection<string>, CancellationToken, int?>((history, _, _, _) => onCall?.Invoke(history))
+            .ReturnsAsync(new ChatReplyResult(reply, 10, 5, 42, "test-model"));
         return service;
     }
 

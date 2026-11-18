@@ -38,6 +38,8 @@ public static class ChatClientServiceCollectionExtensions
                 CreateClientOptions(provider.Endpoint))
                 .AsIChatClient();
         })
+        // Innermost: every provider round trip (including tool-loop iterations) reports usage.
+        .Use((inner, _) => new UsageTrackingChatClient(inner))
         .UseFunctionInvocation()
         .UseLogging();
 

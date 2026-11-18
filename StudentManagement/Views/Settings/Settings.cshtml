@@ -1,0 +1,78 @@
+@model ChatSettingsViewModel
+
+@{
+    ViewData["Title"] = "Chat Settings";
+}
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Chat Settings</h2>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+
+    <p class="text-muted">
+        These settings are stored in the database and apply immediately — no restart needed.
+        API keys, endpoints, and model names stay in server configuration (user-secrets) and are not editable here.
+    </p>
+
+    <form asp-action="SaveSettings" method="post" class="col-lg-6">
+        <div asp-validation-summary="ModelOnly" class="text-danger mb-2"></div>
+
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" asp-for="ChatEnabled" />
+            <label class="form-check-label" asp-for="ChatEnabled"></label>
+            <div class="form-text">When off, all chat requests are rejected with a friendly message.</div>
+        </div>
+
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" asp-for="IncludeRag" />
+            <label class="form-check-label" asp-for="IncludeRag"></label>
+            <div class="form-text">Retrieve relevant documentation chunks from the knowledge base before answering.</div>
+        </div>
+
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" asp-for="IncludeTools" />
+            <label class="form-check-label" asp-for="IncludeTools"></label>
+            <div class="form-text">Allow the assistant to query live data. Staff get all tools; other roles get the course catalog.</div>
+        </div>
+
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" asp-for="IncludeFullDocumentation" />
+            <label class="form-check-label" asp-for="IncludeFullDocumentation"></label>
+            <div class="form-text">Embed the full application documentation in every prompt (large token cost).</div>
+        </div>
+
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" asp-for="McpEnabled" />
+            <label class="form-check-label" asp-for="McpEnabled"></label>
+            <div class="form-text">Allow staff to use external MCP integrations (Jira, GitHub). Servers are configured on the server.</div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" asp-for="MaxRagChunks"></label>
+            <input class="form-control" type="number" asp-for="MaxRagChunks" min="1" max="20" />
+            <span asp-validation-for="MaxRagChunks" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label" asp-for="DailyTokenLimit"></label>
+            <input class="form-control" type="number" asp-for="DailyTokenLimit" min="0" max="10000000" />
+            <span asp-validation-for="DailyTokenLimit" class="text-danger"></span>
+            <div class="form-text">Per-user daily token budget (UTC day). Admins are unlimited. Enforcement ships with the usage-tracking update.</div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save Settings</button>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

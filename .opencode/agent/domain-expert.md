@@ -74,6 +74,7 @@ rigorous about separating *enforced* rules from *assumed* ones.
 | `courses_all` | `CourseService.GetAllCourses` | 60 s | course save/delete |
 | `course_{id}` | `CourseService.GetCourseById` | 60 s | that course's save/delete |
 | `course_student_counts` | `CourseService.GetStudentCountPerCourse` | 5 min | course save/delete **only** |
+| `chat_settings` | `AppSettingsService.GetChatSettingsAsync` | 60 s | `SaveChatSettingsAsync` (double-delete: before + after the atomic upsert) |
 
 `IMemoryCache` (in-process) holds `app_knowledge_documentation` — the joined, embedded knowledge base built by `AppKnowledgeService.GetDocumentation()`. It never expires because the documents are immutable for the process; it is not shared across replicas. Startup logs `Distributed cache provider: Redis` or `in-memory (per-process)`.
 

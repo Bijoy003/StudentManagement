@@ -1,3 +1,5 @@
+@model ChatIndexViewModel
+
 @{
     ViewData["Title"] = "Chat";
 }
@@ -14,18 +16,36 @@
 }
 
 <div class="m-3">
-    <h3><b>Chat Assistant</b></h3>
+    <h3><b>Chat Assistant</b> <span class="badge bg-secondary align-middle">@Model.Role</span></h3>
     <p class="text-muted">Ask about how to use the app or query live student, course, and enrollment data. Powered by your configured local AI model.</p>
+    <p class="small text-muted mb-0" id="chat-capability-hint">@Model.CapabilityHint</p>
 </div>
 
 <div class="container border rounded p-3 chat-container">
     @Html.AntiForgeryToken()
+
+    <div id="chat-quota" class="small text-muted mb-2"
+         data-used="@Model.UsedToday" data-limit="@Model.DailyLimit" data-unlimited="@Model.Unlimited.ToString().ToLowerInvariant()">
+        @if (!Model.ChatEnabled)
+        {
+            <span class="text-danger">Chat is currently disabled by the administrator.</span>
+        }
+        else if (Model.Unlimited)
+        {
+            <span>Token usage today: <span id="chat-quota-used">@Model.UsedToday</span> (unlimited — admin)</span>
+        }
+        else
+        {
+            <span>Token usage today: <span id="chat-quota-used">@Model.UsedToday</span> / @Model.DailyLimit</span>
+        }
+    </div>
+
     <div id="chat-messages" class="border rounded p-3 mb-3 bg-light chat-messages">
     </div>
 
     <div id="chat-loading" class="text-muted mb-2 d-none">
         <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-        Thinking...
+        <span id="chat-status-text">Working…</span>
     </div>
 
     <div id="chat-file-preview" class="d-none mb-2 p-2 border rounded bg-light">

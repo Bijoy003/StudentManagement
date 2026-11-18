@@ -17,5 +17,8 @@ namespace StudentManagement.Infrastructure.Data
         public DbSet<Enrollment> Enrollments { get; set; }
         public DbSet<StudentArchive> StudentsArchive { get; set; }
         public DbSet<EnrollmentArchive> EnrollmentsArchive { get; set; }
+        public DbSet<AppSetting> AppSettings { get; set; }
+        public DbSet<ChatUsageLog> ChatUsageLogs { get; set; }
+        public DbSet<ErrorLog> ErrorLogs { get; set; }
     }
 }

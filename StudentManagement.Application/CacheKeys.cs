@@ -9,6 +9,7 @@ public static class CacheKeys
     public const string AllStudents = "students_all";
     public const string AllEnrollments = "enrollments_all";
     public const string CourseStudentCounts = "course_student_counts";
+    public const string ChatSettings = "chat_settings";
 
     public static string Course(int courseId) => $"course_{courseId}";
 

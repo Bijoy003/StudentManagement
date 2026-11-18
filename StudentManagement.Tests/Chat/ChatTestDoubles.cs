@@ -10,6 +10,7 @@ namespace StudentManagement.Tests;
 internal sealed class RecordingChatClient : IChatClient
 {
     private readonly Queue<Func<IReadOnlyList<ChatMessage>, ChatOptions?, ChatResponse>> _responders = new();
+    private readonly Queue<Func<IReadOnlyList<ChatMessage>, ChatOptions?, IAsyncEnumerable<ChatResponseUpdate>>> _streamResponders = new();
 
     public List<IReadOnlyList<ChatMessage>> Requests { get; } = [];
     public List<ChatOptions?> Options { get; } = [];
@@ -53,11 +54,37 @@ internal sealed class RecordingChatClient : IChatClient
         return Task.FromResult(responder(request, options));
     }
 
+    public void EnqueueStream(params ChatResponseUpdate[] updates) =>
+        EnqueueStream((_, _) => ToUpdates(updates));
+
+    public void EnqueueStream(Func<IReadOnlyList<ChatMessage>, ChatOptions?, IAsyncEnumerable<ChatResponseUpdate>> responder) =>
+        _streamResponders.Enqueue(responder);
+
     public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
-        CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException("Streaming is not used by the chat assistant.");
+        CancellationToken cancellationToken = default)
+    {
+        var request = messages.ToList();
+        Requests.Add(request);
+        Options.Add(options);
+        Tokens.Add(cancellationToken);
+
+        var responder = _streamResponders.Count > 0
+            ? _streamResponders.Dequeue()
+            : (_, _) => ToUpdates(new ChatResponseUpdate(ChatRole.Assistant, "ok"));
+
+        return responder(request, options);
+    }
+
+    private static async IAsyncEnumerable<ChatResponseUpdate> ToUpdates(params ChatResponseUpdate[] updates)
+    {
+        foreach (var update in updates)
+        {
+            yield return update;
+            await Task.Yield();
+        }
+    }
 
     public object? GetService(Type serviceType, object? serviceKey = null) => null;
 
