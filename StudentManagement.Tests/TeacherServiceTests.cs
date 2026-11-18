@@ -434,4 +434,74 @@ public class TeacherServiceTests
         mockEnrollmentRepo.Verify(r => r.Update(It.IsAny<Enrollment>()), Times.Never);
         mockEnrollmentRepo.Verify(r => r.SaveChangesAsync(), Times.Never);
     }
+
+    [Fact]
+    public async Task SaveCourseAsync_TeacherCreatesCourseWithCap_ReturnsNullCapToRepository()
+    {
+        // Arrange — the seat cap is admin-managed; a crafted teacher create must not set it
+        var mockCourseRepo = new Mock<ICourseRepository>();
+        var mockEnrollmentRepo = new Mock<IEnrollmentRepository>();
+        Course? saved = null;
+        mockCourseRepo.Setup(r => r.AddAsync(It.IsAny<Course>())).Callback<Course>(c => saved = c);
+        var service = CreateService(mockCourseRepo, mockEnrollmentRepo);
+
+        // Act
+        var result = await service.SaveCourseAsync(
+            new Course { Id = 0, Name = "Algebra", Credits = 3, TeacherId = TeacherId, MaxEnrollments = 5 },
+            TeacherId);
+
+        // Assert
+        Assert.True(result);
+        Assert.NotNull(saved);
+        Assert.Null(saved!.MaxEnrollments);
+    }
+
+    [Fact]
+    public async Task SaveCourseAsync_TeacherEditsWithSpoofedCap_RestampsPersistedCap()
+    {
+        // Arrange — persisted cap is 3; the teacher's payload claims 99
+        var mockCourseRepo = new Mock<ICourseRepository>();
+        var mockEnrollmentRepo = new Mock<IEnrollmentRepository>();
+        var persisted = OwnedCourse();
+        persisted.MaxEnrollments = 3;
+        SetupCourseLookups(mockCourseRepo, 5, persisted);
+        Course? saved = null;
+        mockCourseRepo.Setup(r => r.Update(It.IsAny<Course>())).Callback<Course>(c => saved = c);
+        var service = CreateService(mockCourseRepo, mockEnrollmentRepo);
+
+        // Act
+        var result = await service.SaveCourseAsync(
+            new Course { Id = 5, Name = "Algebra II", Credits = 4, TeacherId = TeacherId, MaxEnrollments = 99 },
+            TeacherId);
+
+        // Assert
+        Assert.True(result);
+        Assert.NotNull(saved);
+        Assert.Equal(3, saved!.MaxEnrollments);
+    }
+
+    [Fact]
+    public async Task SaveCourseAsync_TeacherEditOmitsCap_RestampsPersistedCap()
+    {
+        // Arrange — the dashboard form never posts MaxEnrollments, so it binds null;
+        // a normal teacher edit must NOT wipe the admin-set cap to unlimited
+        var mockCourseRepo = new Mock<ICourseRepository>();
+        var mockEnrollmentRepo = new Mock<IEnrollmentRepository>();
+        var persisted = OwnedCourse();
+        persisted.MaxEnrollments = 3;
+        SetupCourseLookups(mockCourseRepo, 5, persisted);
+        Course? saved = null;
+        mockCourseRepo.Setup(r => r.Update(It.IsAny<Course>())).Callback<Course>(c => saved = c);
+        var service = CreateService(mockCourseRepo, mockEnrollmentRepo);
+
+        // Act
+        var result = await service.SaveCourseAsync(
+            new Course { Id = 5, Name = "Algebra II", Credits = 4, TeacherId = TeacherId, MaxEnrollments = null },
+            TeacherId);
+
+        // Assert
+        Assert.True(result);
+        Assert.NotNull(saved);
+        Assert.Equal(3, saved!.MaxEnrollments);
+    }
 }

@@ -104,4 +104,42 @@ test.describe('Student self-enrollment', () => {
     await dialog.accept();
     await expect(page).toHaveURL(/\/Enrollment\/Create/);
   });
+
+  test('Teacher dashboard edit preserves the admin-set seat cap', async ({ page }) => {
+    const courseName = unique('E2E Cap Course');
+
+    // Teacher creates a course through the dashboard (becomes its owner).
+    await loginAs(page, 'teacher@teacher.com', 'Teacher123');
+    await page.goto('/Teacher/CreateCourse');
+    await page.locator('#Name').fill(courseName);
+    await page.locator('#Credits').fill('3');
+    await page.getByRole('button', { name: 'Create Course', exact: true }).click();
+    await expect(page.locator('#coursesTable')).toContainText(courseName);
+
+    // Admin sets the seat cap on that course.
+    await logout(page);
+    await login(page);
+    await page.goto('/Course/Index');
+    const courseId = (await page.locator('tr', { hasText: courseName }).locator('td').first().textContent())!.trim();
+    await page.goto(`/Course/Create?id=${courseId}`);
+    await page.locator('#max-enrollments').fill('1');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page).toHaveURL(/\/Course\/Index/);
+
+    // Teacher renames the course via the dashboard. The edit form never posts
+    // MaxEnrollments — regression: that used to bind null and wipe the cap.
+    await logout(page);
+    await loginAs(page, 'teacher@teacher.com', 'Teacher123');
+    await page.goto('/Teacher/ManageCourses');
+    await page.locator('tr', { hasText: courseName }).getByRole('link', { name: 'Edit', exact: true }).click();
+    await page.locator('#Name').fill(`${courseName} II`);
+    await page.getByRole('button', { name: 'Update Course', exact: true }).click();
+    await expect(page.locator('.alert-success')).toContainText('Course updated successfully.');
+
+    // The admin-set cap survived the teacher edit.
+    await logout(page);
+    await login(page);
+    await page.goto(`/Course/Create?id=${courseId}`);
+    await expect(page.locator('#max-enrollments')).toHaveValue('1');
+  });
 });

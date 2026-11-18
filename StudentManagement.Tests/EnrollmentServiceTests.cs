@@ -487,6 +487,49 @@ public class EnrollmentServiceTests
         mockRepo.Verify(r => r.SaveChangesAsync(), Times.Never);
     }
 
+    [Fact]
+    public async Task SaveEnrollment_UpdateMovingToCourseWithFreeSeats_SavesEnrollment()
+    {
+        // Arrange — enrollment 10 moves from course 2 into course 3, which has a free seat
+        var mockRepo = new Mock<IEnrollmentRepository>();
+        mockRepo.Setup(r => r.GetByIdAsyncReadOnly(10))
+            .ReturnsAsync(new Enrollment { Id = 10, StudentId = 7, CourseId = 2 });
+        mockRepo.Setup(r => r.CountByCourseIdAsyncReadOnly(3)).ReturnsAsync(1);
+        mockRepo.Setup(r => r.SaveChangesAsync()).Returns(Task.CompletedTask);
+        var courseRepo = new Mock<ICourseRepository>();
+        courseRepo.Setup(r => r.GetByIdAsyncReadOnly(3))
+            .ReturnsAsync(new Course { Id = 3, Name = "Physics", MaxEnrollments = 2 });
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = CreateService(mockRepo, memoryCache, CreateDistributedCacheMock(), courseRepo);
+
+        // Act
+        await service.SaveEnrollment(new Enrollment { Id = 10, StudentId = 7, CourseId = 3 });
+
+        // Assert
+        mockRepo.Verify(r => r.Update(It.Is<Enrollment>(e => e.Id == 10 && e.CourseId == 3)), Times.Once);
+        mockRepo.Verify(r => r.SaveChangesAsync(), Times.Once);
+        mockRepo.Verify(r => r.CountByCourseIdAsyncReadOnly(3), Times.Once);
+    }
+
+    [Fact]
+    public async Task SaveEnrollment_LegacyConstructionWithoutCourseRepository_SavesWithoutCapacityCheck()
+    {
+        // Arrange — regression guard: legacy 4-arg constructions (no course repository)
+        // keep the pre-capacity behavior; DI always injects the repository in production
+        var mockRepo = new Mock<IEnrollmentRepository>();
+        mockRepo.Setup(r => r.AddAsync(It.IsAny<Enrollment>())).Returns(Task.CompletedTask);
+        mockRepo.Setup(r => r.SaveChangesAsync()).Returns(Task.CompletedTask);
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = CreateService(mockRepo, memoryCache, CreateDistributedCacheMock());
+
+        // Act
+        await service.SaveEnrollment(new Enrollment { Id = 0, StudentId = 7, CourseId = 3 });
+
+        // Assert
+        mockRepo.Verify(r => r.AddAsync(It.IsAny<Enrollment>()), Times.Once);
+        mockRepo.Verify(r => r.CountByCourseIdAsyncReadOnly(It.IsAny<int>()), Times.Never);
+    }
+
     private static EnrollmentService CreateService(
         Mock<IEnrollmentRepository> repository,
         IMemoryCache memoryCache,

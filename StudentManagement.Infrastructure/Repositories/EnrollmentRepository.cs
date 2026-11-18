@@ -66,6 +66,10 @@ namespace StudentManagement.Infrastructure.Repositories
             await _dbContext.SaveChangesAsync();
         }
 
+        // Write guards (duplicate check / seat count). These read through the read-only
+        // context, which prefers a read replica when one is configured: with a lagging
+        // replica the check-then-insert race widens to the replication lag. Accepted for
+        // the current single-server deployment; revisit if a real replica is introduced.
         public async Task<Enrollment?> GetByStudentAndCourseAsyncReadOnly(int studentId, int courseId)
         {
             return await _readOnlyDbContext.Enrollments

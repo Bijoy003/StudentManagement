@@ -50,6 +50,9 @@ public class TeacherService : ITeacherService
 
         if (course.Id == 0)
         {
+            // The seat cap is admin-managed: teacher creates never carry one, even if
+            // a crafted payload posts MaxEnrollments.
+            course.MaxEnrollments = null;
             await _courseRepository.AddAsync(course);
             await _courseRepository.SaveChangesAsync();
             await InvalidateCourseCacheAsync(course.Id);
@@ -62,6 +65,9 @@ public class TeacherService : ITeacherService
             return false;
         }
 
+        // Restamp the admin-set cap: the dashboard form never posts MaxEnrollments
+        // (it would bind null and wipe the cap), and a crafted payload must not raise it.
+        course.MaxEnrollments = persisted.MaxEnrollments;
         _courseRepository.Update(course);
         await _courseRepository.SaveChangesAsync();
         await InvalidateCourseCacheAsync(course.Id);

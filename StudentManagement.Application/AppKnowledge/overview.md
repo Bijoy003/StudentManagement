@@ -14,15 +14,16 @@ Student Management is an ASP.NET Core MVC web application for managing students,
 - Home — landing page
 - My Profile — view and update account details
 - Users — admin-only user creation
-- Students — student CRUD and reports
-- Courses — course CRUD and reports
-- Enrollments — link students to courses and view relationships
+- Students — student grid (Admin and Teacher); create/edit/delete and the EnrolledInMoreThan report are admin-only
+- Courses — course catalog and reports; staff manage courses, students self-enroll from here
+- Enrollments — staff link students to courses and view relationships
+- My Courses — Student role: view and drop own enrollments (enrolling happens in the Courses catalog; the account must be linked to a student record by an admin)
 - Chat — AI assistant for app help and live data questions
 
 ## Data model summary
 
 - Student: Id, Name, Email, Phone, Address, DateOfEnroll
-- Course: Id, Name, Credits
+- Course: Id, Name, Credits, optional admin-set Maximum Enrollments (seat cap; empty = unlimited)
 - Enrollment: links a Student to a Course with an optional Grade
 
 ## Important behavior

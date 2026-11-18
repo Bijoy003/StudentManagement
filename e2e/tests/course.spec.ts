@@ -24,10 +24,14 @@ test.describe('Course', () => {
   test('Empty form stays on create page', async ({ page }) => {
     await login(page);
     await page.goto('/Course/Create');
+    const dialogPromise = page.waitForEvent('dialog');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
+    const dialog = await dialogPromise;
+    expect(dialog.message()).toContain('Name is required');
+    await dialog.accept();
 
-    // Server-side validation rejects the empty payload (400); course.js has no error
-    // handler, so the page must not navigate away.
+    // Server-side validation rejects the empty payload (400); course.js surfaces the
+    // error message in an alert and the page must not navigate away.
     await expect(page).toHaveURL(/\/Course\/Create/);
     await expect(page.locator('#name')).toBeVisible();
   });

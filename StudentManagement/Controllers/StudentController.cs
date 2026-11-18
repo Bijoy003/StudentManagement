@@ -182,6 +182,10 @@ namespace StudentManagement.Web.Controllers
                     return RedirectToAction(nameof(MyCourses));
                 }
 
+                // GetEnrollmentById is cached (60 s), but every enrollment write path
+                // evicts enrollment_{id}, so the ownership check cannot act on a stale
+                // row in the single-instance deployment. Worst case after a course
+                // cascade-delete is a no-op drop, never a wrongful delete.
                 var enrollment = await _enrollmentService.GetEnrollmentById(enrollmentId);
                 if (enrollment is null || enrollment.StudentId != user.StudentId.Value)
                 {
