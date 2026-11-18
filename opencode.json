@@ -51,6 +51,8 @@
         "apiKey": "{env:DASHSCOPE_API_KEY}"
       },
       "models": {
+        "qwen4-max": { "name": "Qwen4 Max" },
+        "qwen4-max-preview": { "name": "Qwen4 Max Preview" },
         "qwen3.8-max": { "name": "Qwen3.8 Max" },
         "qwen3.8-flash": { "name": "Qwen3.8 Flash" },
         "qwen3-coder-flash": { "name": "Qwen3 Coder Flash" },

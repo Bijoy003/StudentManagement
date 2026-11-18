@@ -191,8 +191,9 @@ seats have no stronger tier, so escalate by re-briefing with the failure evidenc
 
 Token Plan availability (verified 2026-11, desktop): qwen3.8-max, qwen3.8-flash, glm-5.3,
 deepseek-v4.1-flash-1017, deepseek-v4-pro-0813 all respond; `qwen3-coder-flash` does not exist on the plan
-(coder seats use qwen3.8-flash) and `kimi-k2.7-code` is access-denied. The PAYG night discount
-(22:00-08:00 UTC+8) does not apply to the flat-rate Token Plan.
+(coder seats use qwen3.8-flash) and `kimi-k2.7-code` is access-denied. `qwen4-max-preview` is in the plan
+catalog; plain `qwen4-max` is not listed yet, so it stays configured but may 404 until the plan ships it.
+The PAYG night discount (22:00-08:00 UTC+8) does not apply to the flat-rate Token Plan.
 ## Escalate to the user when
 
 - ACs are ambiguous or the user's request conflicts with AGENTS.md rules or landmines (secrets, raw SQL, the flaky test, schema change without migration).
