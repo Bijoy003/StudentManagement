@@ -17,6 +17,7 @@ using StudentManagement.Infrastructure.Data;
 using StudentManagement.Infrastructure.Repositories;
 using StudentManagement.Infrastructure.Services;
 using StudentManagement.Logging;
+using StudentManagement.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -186,6 +187,7 @@ builder.Services.AddScoped<IErrorLogRepository, ErrorLogRepository>();
 builder.Services.AddScoped<IErrorLogService, ErrorLogService>();
 builder.Services.AddScoped<IChatUsageRepository, ChatUsageRepository>();
 builder.Services.AddScoped<IChatUsageService, ChatUsageService>();
+builder.Services.AddScoped<IChatIndexModelFactory, ChatIndexModelFactory>();
 
 // In-process domain events (observer): dispatcher + assembly-scanned handler registration.
 builder.Services.AddDomainEvents(typeof(DomainEventDispatcher).Assembly);

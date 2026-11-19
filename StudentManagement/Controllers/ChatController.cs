@@ -8,6 +8,7 @@ using StudentManagement.Application.Interfaces;
 using StudentManagement.Application.Services;
 using StudentManagement.Infrastructure.Data;
 using StudentManagement.Web.Models;
+using StudentManagement.Web.Services;
 using System.Diagnostics;
 using System.Security.Claims;
 using System.Text.Json;
@@ -33,6 +34,7 @@ namespace StudentManagement.Web.Controllers
         private readonly ChatOptions _chatOptions;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ILogger<ChatController> _logger;
+        private readonly IChatIndexModelFactory _modelFactory;
 
         public ChatController(
             IChatService chatService,
@@ -42,7 +44,8 @@ namespace StudentManagement.Web.Controllers
             IChatUsageService chatUsage,
             IOptions<ChatOptions> chatOptions,
             UserManager<ApplicationUser> userManager,
-            ILogger<ChatController> logger)
+            ILogger<ChatController> logger,
+            IChatIndexModelFactory modelFactory)
         {
             _chatService = chatService;
             _parsers = parsers;
@@ -52,52 +55,12 @@ namespace StudentManagement.Web.Controllers
             _chatOptions = chatOptions.Value;
             _userManager = userManager;
             _logger = logger;
+            _modelFactory = modelFactory;
         }
 
         public async Task<IActionResult> Index()
         {
-            var settings = await _appSettings.GetChatSettingsAsync();
-            var roles = GetCallerRoles();
-            var isAdmin = roles.Contains(AppRoles.Admin);
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var linkedStudentId = await GetLinkedStudentIdAsync();
-
-            var quota = userId is null
-                ? null
-                : await _chatUsage.GetQuotaStatusAsync(userId, isAdmin, settings.DailyTokenLimit);
-
-            return View(new ChatIndexViewModel
-            {
-                ChatEnabled = settings.ChatEnabled,
-                IsAdmin = isAdmin,
-                Unlimited = quota?.IsUnlimited ?? isAdmin,
-                UsedToday = quota?.UsedToday ?? 0,
-                DailyLimit = settings.DailyTokenLimit,
-                Role = roles.FirstOrDefault() ?? AppRoles.User,
-                HasStudentLink = linkedStudentId is not null,
-                ToolsEnabled = settings.IncludeTools,
-                CapabilityHint = BuildCapabilityHint(roles, linkedStudentId, settings.IncludeTools)
-            });
-        }
-
-        private static string BuildCapabilityHint(string[] roles, int? linkedStudentId, bool toolsEnabled)
-        {
-            if (!toolsEnabled)
-            {
-                return "Live data tools are disabled by the administrator; the assistant answers from documentation only.";
-            }
-
-            if (AppRoles.IsStaff(roles))
-            {
-                return "You can query students, courses, enrollments, counts, and grades.";
-            }
-
-            if (linkedStudentId is not null)
-            {
-                return "You can ask about your own courses, grades, and profile, plus the course catalog.";
-            }
-
-            return "You can browse the course catalog. Ask an admin to link your account to a student record (Admin → Users) to query your own courses and grades.";
+            return View(await _modelFactory.BuildAsync(User));
         }
 
         // The linked student id always comes from the server-side Identity record, never the client.

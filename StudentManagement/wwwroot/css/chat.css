@@ -118,3 +118,83 @@
 .chat-bubble-user .chat-image img {
     border: 1px solid rgba(255, 255, 255, 0.3);
 }
+
+/* Floating chat widget (layout-injected on authenticated pages except /Chat) */
+.chat-widget-toggle {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Below the Bootstrap modal backdrop (1050) so modals stay on top. */
+    z-index: 1040;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.25);
+}
+
+.chat-widget-panel {
+    position: fixed;
+    bottom: 5.5rem;
+    right: 1.5rem;
+    width: 360px;
+    max-width: calc(100vw - 2rem);
+    height: 480px;
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem;
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    z-index: 1040;
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.25);
+}
+
+.chat-widget-panel .chat-widget-header {
+    flex-shrink: 0;
+}
+
+.chat-widget-panel .small,
+.chat-widget-panel #chat-loading,
+.chat-widget-panel #chat-file-preview {
+    flex-shrink: 0;
+}
+
+/* Compact transcript: fills the remaining panel height instead of the page's 400px. */
+.chat-widget-panel .chat-messages {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.chat-widget-panel .input-group {
+    flex-shrink: 0;
+}
+
+.chat-widget-panel .chat-bubble {
+    padding: 0.5rem 0.75rem;
+}
+
+.chat-widget-panel .chat-message {
+    margin-bottom: 0.75rem;
+}
+
+@media (max-width: 576px) {
+    .chat-widget-toggle {
+        bottom: 1rem;
+        right: 1rem;
+    }
+
+    .chat-widget-panel {
+        bottom: 4.75rem;
+        right: 1rem;
+        width: calc(100vw - 2rem);
+        height: 60vh;
+    }
+}

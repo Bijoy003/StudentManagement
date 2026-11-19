@@ -378,7 +378,7 @@ test.describe('Chat', () => {
     expect(await page.evaluate(() => (window as unknown as { __chatXss?: number }).__chatXss)).toBeUndefined();
   });
 
-  test('Reloading the page clears the conversation', async ({ page }) => {
+  test('Reloading the page keeps the conversation', async ({ page }) => {
     await gotoChat(page);
     await page.route('**/Chat/SendStream', route =>
       route.fulfill(fulfillStream(replyEvents('transient'))));
@@ -389,7 +389,62 @@ test.describe('Chat', () => {
 
     await page.reload();
 
-    await expect(page.locator('.chat-message')).toHaveCount(0);
+    await expect(page.locator('.chat-message')).toHaveCount(2);
+    await expect(page.locator('.chat-bubble-user')).toContainText('hello');
+    await expect(page.locator('.chat-markdown')).toContainText('transient');
+  });
+
+  test('Corrupt stored history is sanitized on reload and chat still works', async ({ page }) => {
+    await gotoChat(page);
+    const errors: string[] = [];
+    page.on('pageerror', err => errors.push(err.message));
+
+    // Seed the real per-user key with tampered entries, then reload to hit restore.
+    const userId = await page.locator('.chat-container').getAttribute('data-user-id');
+    const key = `sm.chat.history.${userId}`;
+    const corrupt = {
+      history: [
+        { role: 'user', text: 'numeric name', fileName: 123, fileData: 'aGVsbG8=' },
+        { role: 'user', text: 'xss', fileName: 'evil.png', fileData: 'x" onerror="window.__chatXss=1' },
+        { role: 'system', text: 'invalid role' },
+        { role: 'assistant', text: 42 },
+        { role: 'user', text: 'real image', fileName: 'pixel.png', fileData: PixelPng.toString('base64') },
+        { role: 'assistant', text: 'kept reply' },
+      ],
+      meta: [null, null, null, null, null, { elapsedMs: 120, inputTokens: 10, outputTokens: 5 }],
+    };
+    await page.evaluate(({ k, v }) => sessionStorage.setItem(k, v), { k: key, v: JSON.stringify(corrupt) });
+
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Chat Assistant' })).toBeVisible();
+
+    // Invalid entries dropped, invalid attachment fields stripped, valid image kept.
+    await expect(page.locator('.chat-message')).toHaveCount(4);
+    // fileData stripped: plain text only, no attachment label or image for the tampered entry.
+    await expect(page.locator('.chat-bubble-user').nth(1)).toContainText('xss');
+    await expect(page.locator('.chat-bubble-user').nth(1)).not.toContainText('evil.png');
+    await expect(page.locator('.chat-image img')).toHaveCount(1);
+    await expect(page.locator('.chat-image img')).toHaveAttribute('src', /^data:image\/png;base64,/);
+    await expect(page.locator('[onerror]')).toHaveCount(0);
+    expect(await page.evaluate(() => (window as unknown as { __chatXss?: number }).__chatXss)).toBeUndefined();
+    expect(errors).toEqual([]);
+
+    // The corrupt payload is cleaned out of storage.
+    const storedRaw = await page.evaluate(k => sessionStorage.getItem(k), key);
+    expect(storedRaw).toBeTruthy();
+    expect(storedRaw).not.toContain('onerror');
+    const stored = JSON.parse(storedRaw!) as { history: Array<Record<string, unknown>> };
+    expect(stored.history).toHaveLength(4);
+    expect(stored.history[0]).toEqual({ role: 'user', text: 'numeric name' });
+    expect(stored.history[1]).toEqual({ role: 'user', text: 'xss', fileName: 'evil.png' });
+
+    // Chat still works after the sanitized restore.
+    await page.route('**/Chat/SendStream', route =>
+      route.fulfill(fulfillStream(replyEvents('Still working.'))));
+    await page.locator('#chat-input').fill('after corruption');
+    await page.locator('#chat-send').click();
+    await expect(page.locator('.chat-message')).toHaveCount(6);
+    await expect(page.locator('.chat-markdown').last()).toContainText('Still working.');
   });
 
   test('Anonymous visitor is redirected to login', async ({ page }) => {

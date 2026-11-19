@@ -67,6 +67,10 @@ $(document).ready(function () {
     $(document).on('click', '.chat-edit-cancel', function () {
         renderTranscript();
     });
+
+    if ($('#chat-messages').length) {
+        restoreChatState();
+    }
 });
 
 function showFilePreview(fileName) {
@@ -118,6 +122,7 @@ function sendMessage() {
 
     chatHistory.push(message);
     messageMeta.push(null);
+    persistChatState();
     appendMessage(chatHistory.length - 1, 'user', displayText, imageData);
 
     input.val('');
@@ -145,6 +150,7 @@ async function streamReply() {
             messageMeta.splice(assistantIndex, 1);
             $(`.chat-message[data-history-index="${assistantIndex}"]`).remove();
             assistantIndex = -1;
+            persistChatState();
         }
     };
 
@@ -244,6 +250,7 @@ async function streamReply() {
                 ? { elapsedMs: done.elapsedMs, inputTokens: done.inputTokens, outputTokens: done.outputTokens }
                 : null;
             updateAssistantBubble(assistantIndex, assistantText, messageMeta[assistantIndex]);
+            persistChatState();
         }
 
         if (done && done.quota) {
@@ -321,6 +328,7 @@ function saveEdit(index) {
     chatHistory = chatHistory.slice(0, index + 1);
     messageMeta = messageMeta.slice(0, index + 1);
     chatHistory[index].text = newText;
+    persistChatState();
 
     removeFailureNotice();
     failedRequest = false;
@@ -442,7 +450,127 @@ function normalizeAssistantMarkdown(text) {
 }
 
 function getAntiForgeryToken() {
-    return $('input[name="__RequestVerificationToken"]').val() || '';
+    // Prefer the token inside the active chat root: the navbar logout form emits
+    // a page-wide token too, and the widget panel carries its own.
+    const scoped = $('#chat-input').closest('[data-chat-root]')
+        .find('input[name="__RequestVerificationToken"]').first().val();
+    return scoped || $('input[name="__RequestVerificationToken"]').first().val() || '';
+}
+
+// Conversation persistence: one sessionStorage entry per user, shared by the full
+// chat page and the floating widget (both mark their container with data-chat-root).
+function chatStorageKey() {
+    const userId = $('#chat-messages').closest('[data-chat-root]').attr('data-user-id') || 'anon';
+    return 'sm.chat.history.' + userId;
+}
+
+function persistChatState() {
+    const key = chatStorageKey();
+    try {
+        sessionStorage.setItem(key, JSON.stringify({ history: chatHistory, meta: messageMeta }));
+    } catch (error) {
+        // Storage quota exceeded (large base64 attachments): retry once without file payloads.
+        try {
+            const slimHistory = chatHistory.map(function (m) {
+                const slim = { role: m.role, text: m.text };
+                if (m.fileName) {
+                    slim.fileName = m.fileName;
+                }
+                return slim;
+            });
+            sessionStorage.setItem(key, JSON.stringify({ history: slimHistory, meta: messageMeta }));
+        } catch (retryError) {
+            // Persistence is best-effort; never break the chat UI.
+        }
+    }
+}
+
+// Restored history is attacker-influenced (sessionStorage can be tampered with), so
+// every field is validated before rendering: invalid entries are dropped, invalid
+// attachment fields are stripped, and the transcript is capped. fileData must be
+// plain base64 — it is interpolated into an <img src> attribute and must never
+// carry markup.
+const MAX_RESTORED_MESSAGES = 200;
+const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
+
+function restoreChatState() {
+    const key = chatStorageKey();
+    let raw = null;
+    try {
+        raw = sessionStorage.getItem(key);
+    } catch (error) {
+        return;
+    }
+    if (!raw) {
+        return;
+    }
+
+    let stored = null;
+    try {
+        stored = JSON.parse(raw);
+    } catch (error) {
+        stored = null;
+    }
+    if (!stored || !Array.isArray(stored.history) || !Array.isArray(stored.meta)) {
+        discardStoredChat(key);
+        return;
+    }
+
+    const history = [];
+    const meta = [];
+    let dirty = false;
+    for (let i = 0; i < stored.history.length && history.length < MAX_RESTORED_MESSAGES; i++) {
+        const m = stored.history[i];
+        if (!m || (m.role !== 'user' && m.role !== 'assistant') || typeof m.text !== 'string') {
+            continue;
+        }
+        const clean = { role: m.role, text: m.text };
+        if (typeof m.fileName === 'string' && m.fileName) {
+            clean.fileName = m.fileName;
+            if (typeof m.fileData === 'string' && BASE64_PATTERN.test(m.fileData)) {
+                clean.fileData = m.fileData;
+            }
+        }
+        if (clean.fileName !== m.fileName || clean.fileData !== m.fileData) {
+            dirty = true;
+        }
+        history.push(clean);
+        const storedMeta = stored.meta[i];
+        meta.push(storedMeta && typeof storedMeta.elapsedMs === 'number' ? storedMeta : null);
+    }
+    if (stored.history.length > history.length) {
+        dirty = true;
+    }
+
+    if (history.length === 0) {
+        discardStoredChat(key);
+        return;
+    }
+
+    chatHistory = history;
+    messageMeta = meta;
+    if (dirty) {
+        // Write the sanitized history back so tampered fields cannot linger in storage.
+        persistChatState();
+    }
+
+    try {
+        renderTranscript();
+    } catch (error) {
+        // Corrupt storage must not brick the layout-wide widget: start fresh.
+        chatHistory = [];
+        messageMeta = [];
+        $('#chat-messages').empty();
+        discardStoredChat(key);
+    }
+}
+
+function discardStoredChat(key) {
+    try {
+        sessionStorage.removeItem(key);
+    } catch (error) {
+        // Cleanup is best-effort; never break the chat UI.
+    }
 }
 
 function setInputEnabled(enabled) {

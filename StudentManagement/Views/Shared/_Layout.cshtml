@@ -1,4 +1,7 @@
-﻿<!DOCTYPE html>
+﻿@{
+    var showChatWidget = User.Identity.IsAuthenticated && !string.Equals(ViewContext.RouteData.Values["controller"] as string, "Chat", StringComparison.OrdinalIgnoreCase);
+}
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf8" />
@@ -6,6 +9,10 @@
     <title>@ViewData["Title"] - StudentManagement</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @if (showChatWidget)
+    {
+        <link rel="stylesheet" href="~/css/chat.css" asp-append-version="true" />
+    }
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
     @await RenderSectionAsync("Head", required: false)
@@ -129,6 +136,10 @@
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+    @if (showChatWidget)
+    {
+        @await Component.InvokeAsync("ChatWidget")
+    }
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 

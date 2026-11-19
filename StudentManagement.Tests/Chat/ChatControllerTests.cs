@@ -16,6 +16,7 @@ using StudentManagement.Application.Services;
 using StudentManagement.Infrastructure.Data;
 using StudentManagement.Web.Controllers;
 using StudentManagement.Web.Models;
+using StudentManagement.Web.Services;
 using ChatOptions = StudentManagement.Configuration.ChatOptions;
 
 namespace StudentManagement.Tests;
@@ -731,15 +732,20 @@ public class ChatControllerTests
             .Setup(s => s.GetChatSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(settings ?? new ChatSettings { ChatEnabled = true });
 
+        var usageMock = usage ?? CreateUsageService(new ChatQuotaStatus(0, 20000, false, DateTime.UtcNow.Date.AddDays(1)));
+        var userManagerMock = userManager ?? CreateUserManager();
+        var modelFactory = new ChatIndexModelFactory(appSettings.Object, usageMock.Object, userManagerMock.Object);
+
         return new ChatController(
             (service ?? new Mock<IChatService>()).Object,
             parserList,
             appSettings.Object,
             (errorLog ?? new Mock<IErrorLogService>()).Object,
-            (usage ?? CreateUsageService(new ChatQuotaStatus(0, 20000, false, DateTime.UtcNow.Date.AddDays(1)))).Object,
+            usageMock.Object,
             Options.Create(new ChatOptions { Model = "test-model" }),
-            (userManager ?? CreateUserManager()).Object,
-            NullLogger<ChatController>.Instance)
+            userManagerMock.Object,
+            NullLogger<ChatController>.Instance,
+            modelFactory)
         {
             ControllerContext = CreateContext(AppRoles.Admin)
         };

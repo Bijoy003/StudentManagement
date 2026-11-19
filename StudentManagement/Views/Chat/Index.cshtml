@@ -1,3 +1,4 @@
+@using System.Security.Claims
 @model ChatIndexViewModel
 
 @{
@@ -21,7 +22,8 @@
     <p class="small text-muted mb-0" id="chat-capability-hint">@Model.CapabilityHint</p>
 </div>
 
-<div class="container border rounded p-3 chat-container">
+<div class="container border rounded p-3 chat-container" data-chat-root
+     data-user-id="@User.FindFirstValue(ClaimTypes.NameIdentifier)">
     @Html.AntiForgeryToken()
 
     <div id="chat-quota" class="small text-muted mb-2"
